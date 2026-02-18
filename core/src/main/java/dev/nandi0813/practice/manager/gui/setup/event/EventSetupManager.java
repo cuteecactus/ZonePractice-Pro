@@ -4,6 +4,8 @@ import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.arena.util.ArenaWorldUtil;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.fight.event.EventManager;
+import dev.nandi0813.practice.manager.fight.event.enums.EventType;
+import dev.nandi0813.practice.manager.fight.event.events.duel.brackets.BracketsData;
 import dev.nandi0813.practice.manager.fight.event.interfaces.EventData;
 import dev.nandi0813.practice.manager.gui.GUI;
 import dev.nandi0813.practice.manager.gui.GUIManager;
@@ -104,6 +106,22 @@ public class EventSetupManager implements Listener {
             } else {
                 eventData.setCuboidLoc2(block.getLocation());
                 Common.sendMMMessage(player, LanguageManager.getString("COMMAND.SETUP.EVENT.SET-SECOND-CORNER").replace("%event%", eventData.getType().getName()));
+            }
+
+            // Check volume limit for Brackets Build Mode
+            if (eventData.getType() == EventType.BRACKETS && eventData.getCuboid() != null) {
+                BracketsData bracketsData = (BracketsData) eventData;
+                if (bracketsData.isBuildMode()) {
+                    int volume = eventData.getCuboid().getVolume();
+                    int limit = BracketsData.getBuildModeVolumeLimit();
+
+                    if (volume > limit) {
+                        Common.sendMMMessage(player, "<yellow>⚠ Warning: Arena volume (" + volume + " blocks) exceeds Build Mode limit (" + limit + " blocks)!");
+                        Common.sendMMMessage(player, "<yellow>Build Mode will be disabled when you try to enable this event.");
+                    } else {
+                        Common.sendMMMessage(player, "<green>✓ Arena size OK for Build Mode (" + volume + "/" + limit + " blocks)");
+                    }
+                }
             }
         } catch (Exception exception) {
             Common.sendMMMessage(player, "<red>" + exception.getMessage());

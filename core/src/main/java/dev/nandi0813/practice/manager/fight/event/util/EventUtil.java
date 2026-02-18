@@ -2,6 +2,7 @@ package dev.nandi0813.practice.manager.fight.event.util;
 
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.fight.event.interfaces.EventData;
+import dev.nandi0813.practice.manager.fight.event.setup.EventSpawnMarkerManager;
 import dev.nandi0813.practice.manager.gui.GUIManager;
 import dev.nandi0813.practice.manager.gui.GUIType;
 import dev.nandi0813.practice.manager.gui.setup.event.EventSetupManager;
@@ -23,7 +24,13 @@ public enum EventUtil {
 
     public static void changeStatus(EventData eventData, Player player) {
         try {
-            eventData.setEnabled(!eventData.isEnabled());
+            boolean wasEnabled = eventData.isEnabled();
+            eventData.setEnabled(!wasEnabled);
+
+            // Clear spawn markers when enabling the event (they should only show during setup)
+            if (eventData.isEnabled()) {
+                EventSpawnMarkerManager.getInstance().clearMarkers(eventData);
+            }
 
             GUIManager.getInstance().getGuis().get(GUIType.Event_Host).update();
             GUIManager.getInstance().getGuis().get(GUIType.Event_Summary).update();

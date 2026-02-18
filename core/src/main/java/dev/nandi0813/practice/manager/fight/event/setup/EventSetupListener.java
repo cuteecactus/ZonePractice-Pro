@@ -292,6 +292,9 @@ public class EventSetupListener implements Listener {
             if (eventData.isEnabled()) {
                 eventData.setEnabled(false);
                 player.sendMessage(Common.colorize("&cDisabled event: &e" + eventData.getType().getName()));
+
+                // Show markers again when disabling for setup
+                EventSpawnMarkerManager.getInstance().showMarkers(eventData);
             } else {
                 if (eventData.getCuboidLoc1() == null || eventData.getCuboidLoc2() == null) {
                     player.sendMessage(Common.colorize("&cYou must set both corners first!"));
@@ -306,12 +309,10 @@ public class EventSetupListener implements Listener {
                 player.sendMessage(Common.colorize("&aEnabled event: &e" + eventData.getType().getName()));
 
                 // When enabling an event, cleanup: clear markers and end setup mode for all players
-                List<Player> playersSettingUp = new ArrayList<>(setupManager.getPlayersSettingUpEvent(eventData));
+                // Clear markers first (they should only show during setup)
+                EventSpawnMarkerManager.getInstance().clearMarkers(eventData);
 
-                // Clear markers first (before ending setup, to avoid duplicate clears)
-                if (!playersSettingUp.isEmpty()) {
-                    EventSpawnMarkerManager.getInstance().clearMarkers(eventData);
-                }
+                List<Player> playersSettingUp = new ArrayList<>(setupManager.getPlayersSettingUpEvent(eventData));
 
                 // End setup mode for all players currently setting up this event
                 for (Player settingUpPlayer : playersSettingUp) {

@@ -1,6 +1,5 @@
 package dev.nandi0813.practice.command.event.arguments.Events;
 
-import dev.nandi0813.practice.command.event.arguments.SpawnPointArg;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.fight.event.EventManager;
 import dev.nandi0813.practice.manager.fight.event.enums.EventType;
@@ -63,6 +62,36 @@ public enum BracketsArg {
             kitData.setKitData(player, true);
 
             Common.sendMMMessage(player, LanguageManager.getString("COMMAND.EVENT.ARGUMENTS.BRACKETS.KIT-SET"));
+        } else if (args.length == 2 && args[1].equalsIgnoreCase("buildmode")) {
+            // Toggle build mode
+            bracketsData.setBuildMode(!bracketsData.isBuildMode());
+
+            if (bracketsData.isBuildMode()) {
+                // Check volume limit
+                if (bracketsData.getCuboid() != null) {
+                    int volume = bracketsData.getCuboid().getVolume();
+                    int limit = BracketsData.getBuildModeVolumeLimit();
+
+                    if (volume > limit) {
+                        bracketsData.setBuildMode(false);
+                        Common.sendMMMessage(player, "<red>✗ Cannot enable Build Mode! Arena is too large.");
+                        Common.sendMMMessage(player, "<red>Current volume: " + volume + " blocks | Maximum: " + limit + " blocks");
+                        Common.sendMMMessage(player, "<yellow>Tip: Make the arena smaller to use Build Mode.");
+                        return;
+                    }
+                }
+
+                Common.sendMMMessage(player, "<green>✓ Build Mode ENABLED for Brackets event!");
+                Common.sendMMMessage(player, "<yellow>Each match will get a fresh arena copy.");
+            } else {
+                Common.sendMMMessage(player, "<yellow>Build Mode DISABLED for Brackets event.");
+            }
+
+            try {
+                bracketsData.setData();
+            } catch (Exception e) {
+                Common.sendMMMessage(player, "<red>Error saving data: " + e.getMessage());
+            }
         } else {
             sendHelpMSG(player, label);
         }
@@ -80,6 +109,7 @@ public enum BracketsArg {
 
         if (args.length == 2) {
             arguments.add("setkit");
+            arguments.add("buildmode");
             arguments.add("enable");
             arguments.add("disable");
 
