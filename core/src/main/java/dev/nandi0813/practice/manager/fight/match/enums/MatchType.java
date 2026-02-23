@@ -9,7 +9,9 @@ public enum MatchType {
     DUEL(ConfigManager.getConfig().getString("MATCH-SETTINGS.MATCH-TYPE-NAMES.DUEL"), "DUEL"),
     PARTY_FFA(ConfigManager.getConfig().getString("MATCH-SETTINGS.MATCH-TYPE-NAMES.PARTY_FFA"), "PARTY-FFA"),
     PARTY_SPLIT(ConfigManager.getConfig().getString("MATCH-SETTINGS.MATCH-TYPE-NAMES.PARTY_SPLIT"), "PARTY-SPLIT"),
-    PARTY_VS_PARTY(ConfigManager.getConfig().getString("MATCH-SETTINGS.MATCH-TYPE-NAMES.PARTY_VS_PARTY"), "PARTY-VS-PARTY");
+    PARTY_VS_PARTY(ConfigManager.getConfig().getString("MATCH-SETTINGS.MATCH-TYPE-NAMES.PARTY_VS_PARTY"), "PARTY-VS-PARTY"),
+    /** 1-vs-bot duel driven by an external neural-network model. */
+    BOT_DUEL("Bot Duel", "BOT-DUEL");
 
     private final String name;
     @Getter

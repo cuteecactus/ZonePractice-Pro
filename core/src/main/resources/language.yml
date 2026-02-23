@@ -1411,6 +1411,37 @@ MATCH:
         - "%spectatorExtension%"
         - "<gray><st>----------------------------------------"
         - "%rankedExtension%"
+  BOT-DUEL:
+    PLAYER-LEFT: "<red>%player% <yellow>left the match."
+    START:
+      MATCH-STARTING: "<yellow>Match is starting in <gold>%seconds% <yellow>%secondName%."
+      MATCH-STARTED: "<green>Match has been started."
+    MATCH-START:
+      - "<gray><st>----------------------------------------"
+      - "%matchTypeName%"
+      - ""
+      - " <yellow>» Kit: <white>%ladder%"
+      - " <yellow>» Map: <white>%arena%"
+      - " <yellow>» Rounds: <white>%rounds%"
+      - ""
+      - "<gold>%player% <gray>vs <light_purple>PvpBot"
+      - "<gray><st>----------------------------------------"
+    MATCH-END-WIN:
+      - "<gray><st>----------------------------------------"
+      - "<green>%player% <yellow>defeated the <light_purple>PvpBot<yellow>!"
+      - "<gray><st>----------------------------------------"
+    MATCH-END-LOSS:
+      - "<gray><st>----------------------------------------"
+      - "<light_purple>PvpBot <yellow>defeated <red>%player%<yellow>!"
+      - "<gray><st>----------------------------------------"
+    MATCH-END-ROUND:
+      - "<gray><st>----------------------------------------"
+      - "%player% <yellow>has <green>won <yellow>the round. <light_purple>%round% <yellow>more to win the match."
+      - "<gray><st>----------------------------------------"
+    MATCH-END-ROUND-BOT-WIN:
+      - "<gray><st>----------------------------------------"
+      - "<light_purple>PvpBot <yellow>has <green>won <yellow>the round."
+      - "<gray><st>----------------------------------------"
   PARTY-FFA:
     PLAYER-LEFT: "<red>%player% <yellow>left the match."
     START:

@@ -139,6 +139,7 @@ MATCH-SETTINGS:
     PARTY_FFA: "&e&lParty FFA"
     PARTY_SPLIT: "&e&lParty Split"
     PARTY_VS_PARTY: "&e&lParty Vs Party"
+    BOT_DUEL: "&d&lBot Duel"
   WEIGHT-CLASS:
     UNRANKED: "&aUnranked"
     RANKED: "&cRanked"
@@ -194,6 +195,13 @@ MATCH-SETTINGS:
     ROUND-SELECTOR:
       MAX: 10
       MIN: 1 # Can't be lower than 1.
+  BOT-DUEL:
+    AI-SERVER-URL: "http://127.0.0.1:8000" # Base URL of the Python inference server. /predict will be appended automatically.
+    CONNECT-TIMEOUT-MS: 500  # HTTP connect timeout in milliseconds.
+    READ-TIMEOUT-MS: 5000     # HTTP read timeout in milliseconds.
+    WINDOW-SIZE: 20          # Number of game ticks kept in the sliding window sent to the model.
+    BOT-DEFAULT-DAMAGE: 3.0  # Logical HP damage applied to the bot per successful hit (hearts × 2).
+    BOT-ATTACK-DAMAGE: 5.0   # Damage the bot deals to the player per hit (Bukkit units, 2 = 1 heart).
   ENDERPEARL:
     COOLDOWN: 13 # This is the default cooldown. You can change it in the ladder settings.
     EXP-BAR: true # Countdown shows on exp bar.

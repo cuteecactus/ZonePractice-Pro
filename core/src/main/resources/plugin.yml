@@ -50,6 +50,8 @@ commands:
     description: Copy a custom kit from another player.
   ignorequeue:
     description: Ignore a player in unranked queue.
+  botduel:
+    description: Start a 1-vs-bot duel against the AI. Usage /botduel [ladder]
 
 permissions:
   zpp.admin:
@@ -230,6 +232,10 @@ permissions:
 
   zpp.duel.infiniteinvite:
     description: Player can invite player to duel any number of times.
+
+  zpp.botduel:
+    default: op
+    description: Start a 1-vs-bot duel via /botduel [ladder].
   zpp.party.selectarena:
     description: Choose arena to play in with party.
   zpp.party.selectrounds:

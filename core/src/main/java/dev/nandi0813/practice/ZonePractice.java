@@ -1,5 +1,7 @@
 package dev.nandi0813.practice;
 
+import com.github.juliarn.npclib.api.Platform;
+import com.github.juliarn.npclib.bukkit.BukkitPlatform;
 import com.github.retrooper.packetevents.PacketEvents;
 import dev.nandi0813.practice.command.accept.AcceptCommand;
 import dev.nandi0813.practice.command.arena.ArenaCommand;
@@ -53,6 +55,10 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -75,6 +81,10 @@ public final class ZonePractice extends JavaPlugin {
     @Getter
     private static volatile boolean fullyLoaded = false;
 
+    /** Shared NPC-Lib platform used by {@link dev.nandi0813.practice.manager.fight.match.bot.BotMatch}. */
+    @Getter
+    private static Platform<World, Player, ItemStack, Plugin> npcPlatform;
+
     private Metrics metrics;
 
     @Override
@@ -90,6 +100,19 @@ public final class ZonePractice extends JavaPlugin {
         miniMessage = MiniMessage.miniMessage();
         PacketEvents.getAPI().init();
         metrics = new Metrics(this, 16055);
+
+        // Build the shared NPC platform used by BotMatch
+        npcPlatform = BukkitPlatform
+                .bukkitNpcPlatformBuilder()
+                .extension(this)
+                .actionController(builder ->
+                        builder.flag(com.github.juliarn.npclib.api.NpcActionController.SPAWN_DISTANCE, 64))
+                .build();
+
+        // Register the NPC attack listener for bot matches
+        npcPlatform.eventManager().registerEventHandler(
+                com.github.juliarn.npclib.api.event.AttackNpcEvent.class,
+                new dev.nandi0813.practice.manager.fight.match.bot.BotMatchListener());
 
         if (VersionChecker.getBukkitVersion() == null) {
             Common.sendConsoleMMMessage("<red>Unsupported server version! Please use 1.8.8 or 1.8.9 or 1.20.6 or 1.21.4");
@@ -325,6 +348,13 @@ public final class ZonePractice extends JavaPlugin {
         if (server.getPluginCommand("ignorequeue") != null) {
             server.getPluginCommand("ignorequeue").setExecutor(ignoreQueueCommand);
             server.getPluginCommand("ignorequeue").setTabCompleter(ignoreQueueCommand);
+        }
+
+        dev.nandi0813.practice.command.botduel.BotDuelCommand botDuelCommand =
+                new dev.nandi0813.practice.command.botduel.BotDuelCommand();
+        if (server.getPluginCommand("botduel") != null) {
+            server.getPluginCommand("botduel").setExecutor(botDuelCommand);
+            server.getPluginCommand("botduel").setTabCompleter(botDuelCommand);
         }
 
         if (ConfigManager.getBoolean("CHAT.PRIVATE-CHAT-ENABLED")) {

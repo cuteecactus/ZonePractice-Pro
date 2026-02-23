@@ -51,6 +51,9 @@ public class MatchTypeGui extends GUI {
 
 
         for (MatchType matchType : MatchType.values()) {
+            if (matchType.equals(MatchType.BOT_DUEL))
+                continue;
+
             if (!ladderType.isPartyFFASupported() && (matchType.equals(MatchType.PARTY_FFA)))
                 continue;
 
