@@ -282,6 +282,25 @@ public class ArenaSetupListener implements Listener {
         Location portalLoc = block.getLocation();
         if (isOutsideRegion(player, arena, portalLoc)) return;
 
+        // Determine effective floor: dead zone takes priority, otherwise lowest arena Y
+        int floorY;
+        String floorType;
+        if (arena.isDeadZone()) {
+            floorY = arena.getDeadZoneValue();
+            floorType = "dead zone";
+        } else {
+            floorY = arena.getCuboid().getLowerY();
+            floorType = "lowest arena Y";
+        }
+
+        // Portal center must be more than 1 block above the floor
+        if (portalLoc.getBlockY() <= floorY + 1) {
+            Common.sendMMMessage(player, LanguageManager.getString("COMMAND.ARENA.ARGUMENTS.PORTAL.TOO-LOW-FOR-FLOOR")
+                    .replace("%floor_type%", floorType)
+                    .replace("%floor_y%", String.valueOf(floorY)));
+            return;
+        }
+
         PortalLocation portalLocation = new PortalLocation(portalLoc);
 
         if (action == Action.LEFT_CLICK_BLOCK) {
@@ -360,6 +379,22 @@ public class ArenaSetupListener implements Listener {
 
         arena.setDeadZoneValue(deadZoneY);
         arena.setDeadZone(true);
+
+        // Invalidate portals that are now at or below the new dead zone floor
+        if (arena instanceof Arena a) {
+            if (a.getPortalLoc1() != null && a.getPortalLoc1().getCenter().getBlockY() <= deadZoneY + 1) {
+                a.setPortalLoc1(null);
+                Common.sendMMMessage(player, LanguageManager.getString("COMMAND.ARENA.ARGUMENTS.PORTAL.TOO-LOW-FOR-FLOOR")
+                        .replace("%floor_type%", "dead zone (portal 1 removed)")
+                        .replace("%floor_y%", String.valueOf(deadZoneY)));
+            }
+            if (a.getPortalLoc2() != null && a.getPortalLoc2().getCenter().getBlockY() <= deadZoneY + 1) {
+                a.setPortalLoc2(null);
+                Common.sendMMMessage(player, LanguageManager.getString("COMMAND.ARENA.ARGUMENTS.PORTAL.TOO-LOW-FOR-FLOOR")
+                        .replace("%floor_type%", "dead zone (portal 2 removed)")
+                        .replace("%floor_y%", String.valueOf(deadZoneY)));
+            }
+        }
 
         Common.sendMMMessage(player, LanguageManager.getString("COMMAND.ARENA.ARGUMENTS.SETDEADZONE.SET-DEADZONE")
                 .replace("%arena%", arena.getName())
@@ -462,6 +497,22 @@ public class ArenaSetupListener implements Listener {
         if (arena.isDeadZone() && (cuboid.getLowerY() > arena.getDeadZoneValue() || arena.getDeadZoneValue() > cuboid.getUpperY())) {
             arena.setDeadZone(false);
             Common.sendMMMessage(player, LanguageManager.getString("COMMAND.ARENA.ARGUMENTS.CORNER.DEAD-ZONE-REMOVED").replace("%arena%", arena.getName()));
+        }
+        // Clean Portals — must remain at least 1 block above the effective floor Y
+        if (arena instanceof Arena a) {
+            int floorY = a.isDeadZone() ? a.getDeadZoneValue() : cuboid.getLowerY();
+            if (a.getPortalLoc1() != null && a.getPortalLoc1().getCenter().getBlockY() <= floorY + 1) {
+                a.setPortalLoc1(null);
+                Common.sendMMMessage(player, LanguageManager.getString("COMMAND.ARENA.ARGUMENTS.PORTAL.TOO-LOW-FOR-FLOOR")
+                        .replace("%floor_type%", "new arena floor (portal 1 removed)")
+                        .replace("%floor_y%", String.valueOf(floorY)));
+            }
+            if (a.getPortalLoc2() != null && a.getPortalLoc2().getCenter().getBlockY() <= floorY + 1) {
+                a.setPortalLoc2(null);
+                Common.sendMMMessage(player, LanguageManager.getString("COMMAND.ARENA.ARGUMENTS.PORTAL.TOO-LOW-FOR-FLOOR")
+                        .replace("%floor_type%", "new arena floor (portal 2 removed)")
+                        .replace("%floor_y%", String.valueOf(floorY)));
+            }
         }
         // Clean Beds
         if (arena instanceof Arena a && a.getAssignedLadderTypes().contains(LadderType.BEDWARS)) {
