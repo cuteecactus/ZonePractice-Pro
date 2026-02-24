@@ -570,7 +570,7 @@ public class ArenaSetupListener implements Listener {
         }
 
         // ONLY allow for FFA arenas
-        if (!(arena instanceof FFAArena)) {
+        if (!(arena instanceof FFAArena ffaArena)) {
             player.sendMessage(Common.colorize("&cDirect armor stand removal only works for FFA arenas."));
             player.sendMessage(Common.colorize("&7Use left/right click on blocks to set standard arena spawn positions."));
             return;
@@ -595,7 +595,6 @@ public class ArenaSetupListener implements Listener {
             SpawnMarkerManager.getInstance().updateMarkers(arena);
             updateGui(arena);
 
-            FFAArena ffaArena = (FFAArena) arena;
             player.sendMessage(Common.colorize("&cRemoved FFA spawn. Remaining: " + ffaArena.getFfaPositions().size()));
         } else {
             player.sendMessage(Common.colorize("&cFailed to remove spawn marker."));
