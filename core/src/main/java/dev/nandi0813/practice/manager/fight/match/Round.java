@@ -100,6 +100,8 @@ public abstract class Round extends BukkitRunnable {
         if (!isEndMatch) {
             if (!this.match.getLadder().getType().equals(LadderType.BRIDGES)) {
                 this.match.resetMap();
+            } else if (this.match.getLadder().isResetBuildAfterRound()) {
+                this.match.resetMap();
             }
         }
 
