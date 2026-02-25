@@ -14,7 +14,7 @@ public class UnrankedGui extends QueueSelectorGui {
     }
 
     @Override
-    protected int getUpdateCooldownMinutes() {
+    protected long getUpdateCooldownMinutes() {
         return ConfigManager.getInt("QUEUE.UNRANKED.GUI-UPDATE-MINUTE");
     }
 

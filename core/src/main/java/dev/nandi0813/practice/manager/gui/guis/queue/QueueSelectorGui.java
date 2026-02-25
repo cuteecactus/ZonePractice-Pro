@@ -37,7 +37,7 @@ public abstract class QueueSelectorGui extends GUI {
         build();
     }
 
-    protected abstract int getUpdateCooldownMinutes();
+    protected abstract long getUpdateCooldownMinutes();
 
     protected abstract String getQueueConfigPath();
 

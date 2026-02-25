@@ -14,7 +14,7 @@ public class RankedGui extends QueueSelectorGui {
     }
 
     @Override
-    protected int getUpdateCooldownMinutes() {
+    protected long getUpdateCooldownMinutes() {
         return ConfigManager.getInt("QUEUE.RANKED.GUI-UPDATE-MINUTE");
     }
 
