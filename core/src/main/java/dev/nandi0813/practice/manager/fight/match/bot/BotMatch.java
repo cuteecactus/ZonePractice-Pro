@@ -1,11 +1,8 @@
 package dev.nandi0813.practice.manager.fight.match.bot;
 
-import com.github.juliarn.npclib.api.Npc;
-import com.github.juliarn.npclib.api.Platform;
-import com.github.juliarn.npclib.api.Position;
-import com.github.juliarn.npclib.api.protocol.enums.ItemSlot;
-import com.github.juliarn.npclib.api.protocol.meta.EntityMetadataFactory;
-import com.github.juliarn.npclib.bukkit.util.BukkitPlatformUtil;
+import net.citizensnpcs.api.CitizensAPI;
+import net.citizensnpcs.api.npc.NPC;
+import net.citizensnpcs.api.trait.trait.Equipment;
 import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.arena.arenas.Arena;
 import dev.nandi0813.practice.manager.fight.match.Match;
@@ -21,6 +18,7 @@ import dev.nandi0813.practice.manager.ladder.abstraction.Ladder;
 import dev.nandi0813.practice.manager.ladder.abstraction.interfaces.DeathResult;
 import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
+import dev.nandi0813.practice.manager.backend.ConfigManager;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.server.sound.SoundManager;
 import dev.nandi0813.practice.manager.server.sound.SoundType;
@@ -30,109 +28,102 @@ import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.World;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.Plugin;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A 1-vs-bot duel where one human player fights against an NPC
+ * A 1-vs-bot duel where one human player fights against a Citizens NPC
  * driven by a neural-network model running on an external Python server.
  *
+ * <h3>Architecture</h3>
+ * <ul>
+ *   <li><b>Physics</b>: the NPC is a real {@code PLAYER} entity with full
+ *       Minecraft physics — gravity, knockback, collision, HP, and death are
+ *       all handled by the server and Citizens.  No manual simulation.</li>
+ *   <li><b>Facing</b>: each tick the NPC is made to look at the human player
+ *       via {@link NPC#faceLocation}.</li>
+ *   <li><b>Input application</b>: {@link NeuralBotTrait#run()} is called by
+ *       Citizens every tick and translates the latest
+ *       {@link PvPBotClient.PredictResponse} into sprint, velocity, jump,
+ *       attack, item-use, and hotbar-slot actions on the backing Bukkit Player.</li>
+ *   <li><b>Inference</b>: a 10-frame sliding window is built each tick and an
+ *       async HTTP POST to the Python server fires when the window is full.
+ *       The response is stored in {@link #lastAction} and consumed next tick.</li>
+ * </ul>
+ *
+ * <h3>Kill detection</h3>
+ * <ul>
+ *   <li><b>Human dies</b>: the standard MatchListener handles HP → death → killPlayer.</li>
+ *   <li><b>Bot dies</b>: {@link BotMatchListener} catches the NPC's
+ *       {@code PlayerDeathEvent} (or the {@code EntityDamageByEntityEvent} where
+ *       final damage ≥ NPC HP) and calls {@link #onBotDied(Player)}.</li>
+ *   <li><b>Bot attacks human</b>: {@link NeuralBotTrait} calls
+ *       {@code target.damage(amount, npcEntity)}, which fires a normal
+ *       {@code EntityDamageByEntityEvent}.  {@link BotMatchListener} intercepts
+ *       this to bypass the missing-Profile guard on the NPC entity and then
+ *       lets the normal damage + kill pipeline proceed.</li>
+ * </ul>
+ *
  * <h3>Lifecycle</h3>
- * <ol>
- *   <li>Spawned via {@link #startMatch()} (inherited).</li>
- *   <li>Every tick the bot loop samples the game state, sends it to the
- *       AI over HTTP (async), and applies the returned {@link PvPBotClient.PredictResponse}
- *       back on the main thread.</li>
- *   <li>When the player dies OR calls {@link #endMatch()} the NPC is
- *       despawned and the bot loop is stopped.</li>
- * </ol>
+ * Round start → {@link #spawnBot} → {@link #startBotLoop} → per-tick:
+ * face player + extract frame + async predict → round end → {@link #stopBotLoop}
+ * → {@link #despawnBot}.
  */
 @Getter
 public class BotMatch extends Match implements Team {
 
     // -----------------------------------------------------------------------
-    // NPC Platform (shared, initialised in ZonePractice.onEnable)
+    // NPC / trait state
     // -----------------------------------------------------------------------
 
-    private static Platform<World, Player, ItemStack, Plugin> getNpcPlatform() {
-        return ZonePractice.getNpcPlatform();
-    }
-
-    // -----------------------------------------------------------------------
-    // Bot state
-    // -----------------------------------------------------------------------
-
-    /** Simulated HP of the bot (not enforced by Bukkit, purely logical). */
-    private float botHp = 20f;
-
-    /** The spawned NPC; null until the platform future resolves. */
-    private volatile Npc<World, Player, ItemStack, Plugin> botNpc;
-
-    /** HTTP client — sliding window is managed here in BotMatch. */
-    private final PvPBotClient botClient = new PvPBotClient();
-
-    // Sliding window — circular buffer of the last SEQUENCE_LENGTH frames
-    private final GameFrame[] window  = new GameFrame[PvPBotClient.SEQUENCE_LENGTH];
-    private int  windowHead   = 0;
-    private int  windowFilled = 0;
-
-    /** The per-tick bot AI runnable (non-null while a round is LIVE). */
-    private BukkitTask botTickTask;
-
-    /** Separate every-tick movement task — runs independently of the HTTP loop. */
-    private BukkitTask botMoveTask;
-
-    /** True while an async HTTP predict call is in-flight — prevents pile-up. */
-    private final AtomicBoolean predicting = new AtomicBoolean(false);
-
-    /** Latest action from the model — consumed by the movement tick every tick. */
-    private volatile PvPBotClient.PredictResponse lastAction = null;
-
-    /** Tick counter — attack animation is suppressed until this reaches 0. */
-    private int attackCooldownTick = 0;
-
-
-    /** Melee range in blocks — attack only fires when the player is closer than this. */
-    private static final double MELEE_RANGE_SQ = 3.2 * 3.2; // squared for cheap comparison
-
-    /** Minimum ticks between bot attack swings (~10 ticks ≈ 0.5 s = vanilla sword base speed). */
-    private static final int ATTACK_COOLDOWN_TICKS = 10;
-
-    /** While > 0 the model velocity is skipped so knockback can play out uninterrupted. */
-    private int knockbackTicks = 0;
-    private static final int KNOCKBACK_DURATION = 6; // ticks to let knockback fly before resuming steering
-
-    // -----------------------------------------------------------------------
-    // Logical bot position & velocity (server-side simulation)
-    // -----------------------------------------------------------------------
+    /** The Citizens NPC backing the bot; null until spawned. */
+    private NPC botNpc;
 
     /**
-     * Logical world position of the bot — updated every tick.
-     * {@code npc.position()} stays at the spawn point forever (the lib's
-     * tracked Position is immutable), so we maintain our own copy.
+     * The {@link NeuralBotTrait} attached to {@link #botNpc}.
+     * Null until spawned; used to push new actions each tick.
      */
-    private double botX, botY, botZ;
-
-    /** Current velocity — simulated with gravity and friction each tick. */
-    private double velX = 0, velY = 0, velZ = 0;
-
-    private static final double GRAVITY            = 0.08;
-    private static final double DRAG               = 0.91;   // horizontal friction per tick
+    private NeuralBotTrait neuralTrait;
 
     // -----------------------------------------------------------------------
-    // Match players
+    // Inference state
+    // -----------------------------------------------------------------------
+
+    /** HTTP client for the Python inference server. */
+    private final PvPBotClient botClient = new PvPBotClient();
+
+    /** Circular frame buffer — 10 frames for the GRU window. */
+    private final GameFrame[] window = new GameFrame[PvPBotClient.SEQUENCE_LENGTH];
+    private int windowHead   = 0;
+    private int windowFilled = 0;
+
+    /** Per-tick task: faces NPC toward player + drives the inference loop. */
+    private BukkitTask botTickTask;
+
+    /** True while an async predict HTTP call is in-flight. */
+    private final AtomicBoolean predicting = new AtomicBoolean(false);
+
+    /** Latest model output; pushed to the trait at the start of each tick. */
+    private volatile PvPBotClient.PredictResponse lastAction = null;
+
+    // -----------------------------------------------------------------------
+    // Match player
     // -----------------------------------------------------------------------
 
     private final Player player;
 
-    /** Who won the whole match; null = bot won / draw. */
+    /** Who won the whole match; null = bot won (human lost all rounds). */
     private Player matchWinner;
 
     // -----------------------------------------------------------------------
@@ -151,6 +142,10 @@ public class BotMatch extends Match implements Team {
                 TeamEnum.TEAM1.getNameColor(),
                 TeamEnum.TEAM1.getSuffix(),
                 20);
+
+        // Prefetch item vocabulary in the background so the first frame is ready
+        Bukkit.getScheduler().runTaskAsynchronously(ZonePractice.getInstance(),
+                botClient::fetchVocab);
     }
 
     // -----------------------------------------------------------------------
@@ -161,6 +156,9 @@ public class BotMatch extends Match implements Team {
     public void startNextRound() {
         BotMatchRound round = new BotMatchRound(this, this.rounds.size() + 1);
         this.rounds.put(round.getRoundNumber(), round);
+
+        stopBotLoop();
+        despawnBot();
 
         for (String line : LanguageManager.getList("MATCH.BOT-DUEL.MATCH-START")) {
             this.sendMessage(
@@ -194,7 +192,7 @@ public class BotMatch extends Match implements Team {
     }
 
     // -----------------------------------------------------------------------
-    // Kill / remove / end logic
+    // Kill / remove / end
     // -----------------------------------------------------------------------
 
     @Override
@@ -204,7 +202,8 @@ public class BotMatch extends Match implements Team {
         switch (result) {
             case TEMPORARY_DEATH:
                 asRespawnableLadder().ifPresent(r ->
-                        new dev.nandi0813.practice.manager.fight.match.util.TempKillPlayer(getCurrentRound(), player, r.getRespawnTime()));
+                        new dev.nandi0813.practice.manager.fight.match.util.TempKillPlayer(
+                                getCurrentRound(), player, r.getRespawnTime()));
                 ClassImport.getClasses().getPlayerUtil().clearInventory(player);
                 player.setHealth(20);
                 SoundManager.getInstance().getSound(SoundType.MATCH_PLAYER_TEMP_DEATH).play(this.getPeople());
@@ -217,8 +216,6 @@ public class BotMatch extends Match implements Team {
                 ClassImport.getClasses().getPlayerUtil().clearInventory(player);
                 player.setHealth(20);
                 SoundManager.getInstance().getSound(SoundType.MATCH_PLAYER_DEATH).play(this.getPeople());
-
-                // Bot wins this round
                 getCurrentRound().endRound();
                 break;
         }
@@ -236,8 +233,7 @@ public class BotMatch extends Match implements Team {
             this.sendMessage(
                     TeamUtil.replaceTeamNames(
                             LanguageManager.getString("MATCH.BOT-DUEL.PLAYER-LEFT"),
-                            player,
-                            TeamEnum.TEAM1),
+                            player, TeamEnum.TEAM1),
                     true);
             getCurrentRound().endRound();
         }
@@ -253,155 +249,164 @@ public class BotMatch extends Match implements Team {
     }
 
     @Override
-    public Object getMatchWinner() {
-        return matchWinner;
-    }
+    public Object getMatchWinner() { return matchWinner; }
 
-    /** Typed convenience accessor used by {@link BotMatchRound}. */
-    public Player getMatchWinnerPlayer() {
-        return matchWinner;
-    }
+    public Player getMatchWinnerPlayer() { return matchWinner; }
 
     @Override
     public boolean isEndMatch() {
         if (this.status.equals(MatchStatus.END)) return true;
+        if (this.players.isEmpty()) { this.matchWinner = null; return true; }
+        if (getWonRounds(player) >= winsNeeded) { this.matchWinner = player; return true; }
 
-        // Player left the match
-        if (this.players.isEmpty()) {
-            this.matchWinner = null; // bot wins
-            return true;
-        }
-
-        // Human has accumulated enough round wins
-        if (getWonRounds(player) >= winsNeeded) {
-            this.matchWinner = player;
-            return true;
-        }
-
-        // Bot has enough virtual round wins
         int botWins = 0;
         for (Round r : rounds.values()) {
             if (((BotMatchRound) r).getRoundWinner() == null) botWins++;
         }
-        if (botWins >= winsNeeded) {
-            this.matchWinner = null; // bot wins
-            return true;
-        }
+        if (botWins >= winsNeeded) { this.matchWinner = null; return true; }
 
         return false;
     }
 
     @Override
     public void endMatch() {
-        stopBotLoop();  // also resets the sliding window
+        stopBotLoop();
         despawnBot();
         super.endMatch();
     }
 
     // -----------------------------------------------------------------------
-    // Team interface (player is always TEAM1)
+    // Team interface
     // -----------------------------------------------------------------------
 
     @Override
-    public TeamEnum getTeam(Player player) {
-        return TeamEnum.TEAM1;
-    }
+    public TeamEnum getTeam(Player player) { return TeamEnum.TEAM1; }
 
     // -----------------------------------------------------------------------
     // NPC – spawn / despawn
     // -----------------------------------------------------------------------
 
     /**
-     * Spawns the bot NPC at {@code spawnLoc} and — after the platform
-     * resolves the profile — equips it and starts the AI tick loop.
+     * Spawns the Citizens NPC at {@code spawnLoc} and attaches all traits.
+     *
+     * <ul>
+     *   <li>NPC is a real {@code PLAYER} entity — not protected, so Minecraft
+     *       physics (gravity, knockback, HP depletion) apply normally.</li>
+     *   <li>The NPC is hidden from all players except the duelling player via
+     *       the existing {@link ClassImport} EntityHider after spawn.</li>
+     *   <li>{@link Equipment} equips the ladder kit.</li>
+     *   <li>{@link NeuralBotTrait} drives per-tick inputs.</li>
+     * </ul>
      */
     private void spawnBot(Location spawnLoc) {
-        // Initialise logical position from the spawn location
-        botX = spawnLoc.getX();
-        botY = spawnLoc.getY();
-        botZ = spawnLoc.getZ();
-        velX = 0; velY = 0; velZ = 0;
+        NPC npc = CitizensAPI.createAnonymousNPCRegistry(
+                        new net.citizensnpcs.api.npc.MemoryNPCDataStore())
+                .createNPC(EntityType.PLAYER, "PvpBot");
 
-        getNpcPlatform()
-                .newNpcBuilder()
-                .position(BukkitPlatformUtil.positionFromBukkitLegacy(spawnLoc))
-                .npcSettings(s -> s.trackingRule((npc, p) -> p.equals(player)))
-                .profile(com.github.juliarn.npclib.api.profile.Profile.unresolved("PvpBot"))
-                .thenAccept(builder -> {
-                    Npc<World, Player, ItemStack, Plugin> npc = builder.buildAndTrack();
-                    this.botNpc = npc;
+        // Do NOT call setProtected(true) — we want real HP and physics.
+        // Citizens' default is unprotected, so no call needed.
 
-                    // Equip the bot with the full ladder kit on the main thread
-                    Bukkit.getScheduler().runTask(ZonePractice.getInstance(), () -> {
-                        equipBotKit(npc);
-                        startBotLoop(npc);
-                    });
-                });
+
+        // ── Equipment: full ladder kit ────────────────────────────────────────
+        Equipment equipment = npc.getOrAddTrait(Equipment.class);
+        ItemStack[] storage = ladder.getKitData().getStorage();
+        if (storage != null) {
+            for (ItemStack item : storage) {
+                if (item != null && item.getType() != Material.AIR) {
+                    equipment.set(Equipment.EquipmentSlot.HAND, item);
+                    break;
+                }
+            }
+        }
+        ItemStack[] armor = ladder.getKitData().getArmor();
+        if (armor != null) {
+            if (armor.length > 0 && armor[0] != null && armor[0].getType() != Material.AIR)
+                equipment.set(Equipment.EquipmentSlot.BOOTS,      armor[0]);
+            if (armor.length > 1 && armor[1] != null && armor[1].getType() != Material.AIR)
+                equipment.set(Equipment.EquipmentSlot.LEGGINGS,   armor[1]);
+            if (armor.length > 2 && armor[2] != null && armor[2].getType() != Material.AIR)
+                equipment.set(Equipment.EquipmentSlot.CHESTPLATE, armor[2]);
+            if (armor.length > 3 && armor[3] != null && armor[3].getType() != Material.AIR)
+                equipment.set(Equipment.EquipmentSlot.HELMET,     armor[3]);
+        }
+
+        // ── NeuralBotTrait: drives per-tick player inputs ─────────────────────
+        NeuralBotTrait trait = npc.getOrAddTrait(NeuralBotTrait.class);
+        trait.setTarget(player);
+        this.neuralTrait = trait;
+
+        npc.spawn(spawnLoc);
+        this.botNpc = npc;
+
+        // ── Visibility: hide the NPC from everyone except the duelling player ─
+        // PlayerFilter in Citizens 2 is a blocklist — addPlayer() hides FROM that player.
+        // Instead we use the existing EntityHider after spawn so the entity is real.
+        if (npc.getEntity() != null) {
+            for (org.bukkit.entity.Player online : Bukkit.getOnlinePlayers()) {
+                if (!online.equals(player)) {
+                    ClassImport.getClasses().getEntityHider().hideEntity(online, npc.getEntity());
+                }
+            }
+        }
+
+        startBotLoop();
     }
 
-    /** Completely removes the NPC from the world for all viewers. */
+    /** Despawns and destroys the Citizens NPC safely (no-op if already null). */
     private void despawnBot() {
-        if (botNpc != null) {
-            Bukkit.getScheduler().runTask(ZonePractice.getInstance(), () -> {
-                if (botNpc != null) {
-                    botNpc.unlink();
-                    botNpc = null;
-                }
-            });
-        }
+        if (botNpc == null) return;
+        final NPC npc = botNpc;
+        botNpc      = null;
+        neuralTrait = null;
+        Bukkit.getScheduler().runTask(ZonePractice.getInstance(), () -> {
+            if (npc.isSpawned()) npc.despawn();
+            npc.destroy();
+            npc.getOwningRegistry().deregisterAll();
+        });
     }
 
     // -----------------------------------------------------------------------
-    // AI tick loop
+    // Bot loop — inference + facing
     // -----------------------------------------------------------------------
 
     /**
-     * Runs every tick.  The game-state snapshot is built on the main thread,
-     * the HTTP call is made asynchronously, and the resulting
-     * {@link PvPBotClient.PredictResponse} is applied back on the main thread.
+     * Per-tick task that:
+     * <ol>
+     *   <li>Makes the NPC face the human player.</li>
+     *   <li>Pushes the latest action to {@link NeuralBotTrait}.</li>
+     *   <li>Builds a {@link GameFrame} and appends it to the sliding window.</li>
+     *   <li>Fires an async predict call when the window is full.</li>
+     * </ol>
      */
-    private void startBotLoop(Npc<World, Player, ItemStack, Plugin> npc) {
-
-        // ── Movement loop: every tick ──────────────────────────────────────────
-        // Runs independently of HTTP latency — uses whatever lastAction was last
-        // received from the model, or a default "walk toward player" if none yet.
-        botMoveTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (botNpc == null
-                        || status.equals(MatchStatus.END)
-                        || status.equals(MatchStatus.OVER)) {
-                    cancel();
-                    return;
-                }
-                tickMovement(npc, lastAction);
-            }
-        }.runTaskTimer(ZonePractice.getInstance(), 0L, 1L);
-
-        // ── AI / HTTP loop: every tick, skips if a request is in-flight ───────
+    private void startBotLoop() {
         botTickTask = new BukkitRunnable() {
             @Override
             public void run() {
-                if (botNpc == null
+                if (botNpc == null || !botNpc.isSpawned()
                         || status.equals(MatchStatus.END)
                         || status.equals(MatchStatus.OVER)) {
                     cancel();
                     return;
                 }
 
-                // Build frame on main thread
-                GameFrame frame = extractGameFrame(npc);
+                // ── 1. Push latest action to the trait ───────────────────────
+                if (neuralTrait != null && lastAction != null) {
+                    neuralTrait.setCurrentAction(lastAction);
+                }
 
-                // Push into circular window
+                // ── 3. Build and append the game-state frame ─────────────────
+                GameFrame frame = extractGameFrame();
                 window[windowHead] = frame;
                 windowHead = (windowHead + 1) % PvPBotClient.SEQUENCE_LENGTH;
                 if (windowFilled < PvPBotClient.SEQUENCE_LENGTH) windowFilled++;
                 if (windowFilled < PvPBotClient.SEQUENCE_LENGTH) return;
 
+                // ── 4. Ordered window snapshot ────────────────────────────────
                 final GameFrame[] ordered = new GameFrame[PvPBotClient.SEQUENCE_LENGTH];
                 for (int i = 0; i < PvPBotClient.SEQUENCE_LENGTH; i++)
                     ordered[i] = window[(windowHead + i) % PvPBotClient.SEQUENCE_LENGTH];
 
+                // ── 5. Fire async predict (skip if one is already in-flight) ─
                 if (!predicting.compareAndSet(false, true)) return;
 
                 Bukkit.getScheduler().runTaskAsynchronously(ZonePractice.getInstance(), () -> {
@@ -413,290 +418,171 @@ public class BotMatch extends Match implements Team {
                     }
                 });
             }
-        }.runTaskTimer(ZonePractice.getInstance(), 0L, 1L);
+        }.runTaskTimer(ZonePractice.getInstance(), 1L, 1L);
     }
 
-    /**
-     * Equips the bot NPC with the full ladder kit.
-     * Bukkit armor array order: [0]=boots, [1]=leggings, [2]=chestplate, [3]=helmet.
-     * Must be called on the main thread.
-     */
-    private void equipBotKit(Npc<World, Player, ItemStack, Plugin> npc) {
-        // --- main hand: first non-null item in storage ---
-        ItemStack[] storage = ladder.getKitData().getStorage();
-        if (storage != null) {
-            for (ItemStack item : storage) {
-                if (item != null && item.getType() != Material.AIR) {
-                    npc.changeItem(ItemSlot.MAIN_HAND, item).scheduleForTracked();
-                    break;
-                }
-            }
-        }
-
-        // --- armor ---
-        ItemStack[] armor = ladder.getKitData().getArmor();
-        if (armor != null) {
-            // Bukkit: [0]=boots [1]=leggings [2]=chestplate [3]=helmet
-            if (armor.length > 0 && armor[0] != null && armor[0].getType() != Material.AIR)
-                npc.changeItem(ItemSlot.FEET,       armor[0]).scheduleForTracked();
-            if (armor.length > 1 && armor[1] != null && armor[1].getType() != Material.AIR)
-                npc.changeItem(ItemSlot.LEGS,    armor[1]).scheduleForTracked();
-            if (armor.length > 2 && armor[2] != null && armor[2].getType() != Material.AIR)
-                npc.changeItem(ItemSlot.CHEST,  armor[2]).scheduleForTracked();
-            if (armor.length > 3 && armor[3] != null && armor[3].getType() != Material.AIR)
-                npc.changeItem(ItemSlot.HEAD,      armor[3]).scheduleForTracked();
-        }
-    }
-
-    /**
-     * Called every tick by the movement loop.
-     * {@code action} may be null before the first HTTP response arrives.
-     */
-    private void tickMovement(Npc<World, Player, ItemStack, Plugin> npc,
-                              PvPBotClient.PredictResponse action) {
-
-        double groundY = arena.getPosition2() != null
-                ? arena.getPosition2().getY() : arena.getPosition1().getY();
-        Location pLoc = player.getLocation();
-        boolean onGround = (botY <= groundY + 0.05);
-
-        // ── 1. Steering ───────────────────────────────────────────────────────
-        if (knockbackTicks > 0) {
-            knockbackTicks--;
-            // Decay knockback velocity horizontally each tick
-            velX *= 0.6;
-            velZ *= 0.6;
-        } else {
-            double toPlayerDx = pLoc.getX() - botX;
-            double toPlayerDz = pLoc.getZ() - botZ;
-            double dist = Math.sqrt(toPlayerDx * toPlayerDx + toPlayerDz * toPlayerDz);
-
-            if (dist > 0.5) {
-                boolean sprint = action != null && action.sprint;
-                double speed = sprint ? 0.25 : 0.15;
-                // Set directly — no drag so the NPC actually moves at consistent speed
-                velX = (toPlayerDx / dist) * speed;
-                velZ = (toPlayerDz / dist) * speed;
-            } else {
-                velX = 0;
-                velZ = 0;
-            }
-
-            boolean jump = action != null && action.jump;
-            if (jump && onGround) {
-                velY = 0.42;
-            }
-        }
-
-        // ── 2. Gravity — only when airborne ──────────────────────────────────
-        if (!onGround || velY > 0) {
-            velY -= GRAVITY;
-        }
-
-        // ── 3. Update logical position + ground clamp ────────────────────────
-        double newX = botX + velX;
-        double newY = botY + velY;
-        double newZ = botZ + velZ;
-
-        if (newY <= groundY) {
-            newY = groundY;
-            velY = 0;
-        }
-
-        double dx = newX - botX;
-        double dy = newY - botY;
-        double dz = newZ - botZ;
-        botX = newX;
-        botY = newY;
-        botZ = newZ;
-
-        // ── 4. Facing yaw toward player ──────────────────────────────────────
-        double yawRad = Math.atan2(pLoc.getZ() - botZ, pLoc.getX() - botX);
-        float  bodyYaw = (float) Math.toDegrees(yawRad) - 90f;
-
-        // ── 5. Send movement packet ───────────────────────────────────────────
-        // moveRelative handles the walking leg animation + incremental position.
-        npc.moveRelative(dx, dy, dz, bodyYaw, 0f).scheduleForTracked();
-
-        // ── 6. Head looks at player eye level ────────────────────────────────
-        Position playerPos = Position.position(
-                pLoc.getX(), pLoc.getY() + 1.6, pLoc.getZ(),
-                npc.position().worldId());
-        npc.lookAt(playerPos).scheduleForTracked();
-
-        // ── 7. Sprint metadata ────────────────────────────────────────────────
-        boolean isSprinting = (Math.abs(velX) > 0.01 || Math.abs(velZ) > 0.01)
-                && (action == null || action.sprint);
-        npc.changeMetadata(EntityMetadataFactory.sprintingMetaFactory(), isSprinting)
-           .scheduleForTracked();
-
-        if (action == null) return; // no model output yet — skip combat
-
-        // ── 8. Attack: animation + damage + player knockback ─────────────────
-        if (attackCooldownTick > 0) attackCooldownTick--;
-
-        if (action.attack && attackCooldownTick == 0) {
-            double ddx = botX - pLoc.getX();
-            double ddy = botY - pLoc.getY();
-            double ddz = botZ - pLoc.getZ();
-            if (ddx * ddx + ddy * ddy + ddz * ddz <= MELEE_RANGE_SQ) {
-                npc.attack().scheduleForTracked();
-                attackCooldownTick = ATTACK_COOLDOWN_TICKS;
-
-                // Damage
-                double botDamage = dev.nandi0813.practice.manager.backend.ConfigManager
-                        .getDouble("MATCH-SETTINGS.BOT-DUEL.BOT-ATTACK-DAMAGE");
-                if (botDamage <= 0) botDamage = 5.0;
-                player.damage(botDamage);
-
-                // Knockback — push player away from bot position
-                double kbYaw = Math.atan2(pLoc.getZ() - botZ, pLoc.getX() - botX);
-                double kbX = Math.cos(kbYaw) * 0.45;
-                double kbZ = Math.sin(kbYaw) * 0.45;
-                org.bukkit.util.Vector kb = new org.bukkit.util.Vector(kbX, 0.35, kbZ);
-                player.setVelocity(kb);
-            }
-        }
-
-        // ── 9. Use-item / blocking ────────────────────────────────────────────
-        npc.changeMetadata(EntityMetadataFactory.blockingMetaFactory(), action.useItem)
-           .scheduleForTracked();
-    }
-
-    /** Stops and nullifies the bot tick task. */
     private void stopBotLoop() {
         if (botTickTask != null) { botTickTask.cancel(); botTickTask = null; }
-        if (botMoveTask != null) { botMoveTask.cancel(); botMoveTask = null; }
         predicting.set(false);
-        lastAction         = null;
-        attackCooldownTick = 0;
-        knockbackTicks     = 0;
-        windowHead         = 0;
-        windowFilled       = 0;
-        java.util.Arrays.fill(window, null);
+        lastAction   = null;
+        windowHead   = 0;
+        windowFilled = 0;
+        Arrays.fill(window, null);
     }
 
     // -----------------------------------------------------------------------
-    // Game-state extraction (placeholder — fill with real normalisation later)
+    // Game-state extraction — MODEL_DESCRIPTION.md v2.1.0
     // -----------------------------------------------------------------------
 
-    /**
-     * Builds a {@link GameFrame} from the current server state using the
-     * recommended <b>named-value map mode</b> so that missing/future columns
-     * default to 0 on the server side.
-     *
-     * <p><b>TODO:</b> Add remaining columns from {@code GET /col_order} as
-     * real feature extraction is implemented.
-     */
-    private GameFrame extractGameFrame(Npc<World, Player, ItemStack, Plugin> npc) {
-        java.util.Map<String, Double> values = new java.util.LinkedHashMap<>();
+    private GameFrame extractGameFrame() {
+        Map<String, Object> values = new LinkedHashMap<>();
 
-        // --- player state ---
-        values.put("health",     player.getHealth());
-        values.put("max_health", player.getMaxHealth());
-        values.put("food_level", (double) player.getFoodLevel());
-        values.put("saturation", (double) player.getSaturation());
+        double health    = player.getHealth();
+        double maxHealth = Math.max(player.getMaxHealth(), 1.0);
+        values.put("health",     health);
+        values.put("max_health", maxHealth);
 
-        org.bukkit.util.Vector vel = player.getVelocity();
+        Vector vel = player.getVelocity();
         values.put("vel_x", vel.getX());
         values.put("vel_y", vel.getY());
         values.put("vel_z", vel.getZ());
 
-        values.put("yaw",   (double) player.getLocation().getYaw());
-        values.put("pitch", (double) player.getLocation().getPitch());
+        values.put("yaw",        (double) player.getLocation().getYaw());
+        values.put("pitch",      (double) player.getLocation().getPitch());
+        values.put("food_level", (double) player.getFoodLevel());
 
-        values.put("is_on_ground", player.isOnGround() ? 1.0 : 0.0);
-        values.put("is_sprinting", player.isSprinting() ? 1.0 : 0.0);
+        double totalArmor = 0;
+        ItemStack[] armorContents = player.getInventory().getArmorContents();
+        if (armorContents != null) {
+            for (ItemStack piece : armorContents) {
+                if (piece != null && piece.getType() != Material.AIR)
+                    totalArmor += getArmorPoints(piece);
+            }
+        }
+        values.put("total_armor", totalArmor);
 
-        // --- relative bot position (use logical position, not stale npc.position()) ---
-        values.put("target_rel_x",  botX - player.getLocation().getX());
-        values.put("target_rel_y",  botY - player.getLocation().getY());
-        values.put("target_rel_z",  botZ - player.getLocation().getZ());
-        double dx = botX - player.getLocation().getX();
-        double dz = botZ - player.getLocation().getZ();
-        values.put("target_distance", Math.sqrt(dx * dx + dz * dz));
-        values.put("target_health", (double) botHp);
+        // Bot position from the NPC entity itself — accurate since no manual simulation
+        Location botLoc = botNpc.isSpawned() && botNpc.getEntity() != null
+                ? botNpc.getEntity().getLocation()
+                : player.getLocation(); // fallback if not yet spawned
 
-        // --- categorical (all 0 = AIR/NONE until item-vocab lookup is implemented) ---
-        int[] categorical = new int[GameFrame.NUM_CATEGORICAL];
+        Location pLoc = player.getLocation();
+        double relX = botLoc.getX() - pLoc.getX();
+        double relY = botLoc.getY() - pLoc.getY();
+        double relZ = botLoc.getZ() - pLoc.getZ();
+        double dist = Math.sqrt(relX * relX + relZ * relZ);
 
-        return new GameFrame(values, categorical);
+        values.put("target_distance", dist);
+        values.put("target_rel_x",    relX);
+        values.put("target_rel_y",    relY);
+        values.put("target_rel_z",    relZ);
+
+        // Bot HP from the real entity
+        double botHealth = (botNpc.isSpawned() && botNpc.getEntity() instanceof Player botEntity)
+                ? botEntity.getHealth()
+                : 20.0;
+        values.put("target_health", botHealth);
+
+        int attackCooldown = 100;
+        try {
+            java.lang.reflect.Method m = player.getClass()
+                    .getMethod("getAttackCooldownProgress", float.class);
+            attackCooldown = Math.round((float) m.invoke(player, 0f) * 100f);
+        } catch (Exception ignored) {}
+        values.put("attack_cooldown",   (double) attackCooldown);
+        values.put("item_use_duration", 0.0);
+        values.put("selected_slot",     (double) player.getInventory().getHeldItemSlot());
+
+        boolean onGround = player.isOnGround();
+        boolean jumping  = !onGround && vel.getY() > 0;
+        values.put("is_on_ground",  onGround);
+        values.put("is_jumping",    jumping);
+        values.put("is_sprinting",  player.isSprinting());
+        values.put("is_sneaking",   player.isSneaking());
+
+        values.put("has_speed",        player.hasPotionEffect(PotionEffectType.SPEED));
+        values.put("has_strength",     player.hasPotionEffect(PotionEffectType.INCREASE_DAMAGE));
+        values.put("has_regeneration", player.hasPotionEffect(PotionEffectType.REGENERATION));
+        values.put("has_poison",       player.hasPotionEffect(PotionEffectType.POISON));
+
+        boolean usingItem = false;
+        try {
+            usingItem = (boolean) player.getClass().getMethod("isHandRaised").invoke(player);
+        } catch (Exception ignored) {
+            ItemStack held = player.getInventory().getItemInHand();
+            if (held != null && held.getType() != Material.AIR)
+                usingItem = held.getType().isEdible() || held.getType().name().contains("POTION");
+        }
+        values.put("is_using_item",      usingItem);
+        values.put("target_is_blocking", false);
+
+        int[] hotbar = new int[GameFrame.HOTBAR_SIZE];
+        for (int slot = 0; slot < 9; slot++)
+            hotbar[slot] = itemToVocabId(player.getInventory().getItem(slot));
+
+        ItemStack mainHand;
+        try {
+            mainHand = (ItemStack) player.getInventory().getClass()
+                    .getMethod("getItemInMainHand").invoke(player.getInventory());
+        } catch (Exception ignored) {
+            mainHand = player.getInventory().getItemInHand();
+        }
+        hotbar[9] = itemToVocabId(mainHand);
+
+        return new GameFrame(values, hotbar);
+    }
+
+    private int itemToVocabId(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) return 0;
+        return botClient.itemToId(item.getType().name());
+    }
+
+    private static double getArmorPoints(ItemStack piece) {
+        String n = piece.getType().name();
+        if (n.startsWith("DIAMOND") || n.startsWith("NETHERITE")) {
+            if (n.contains("HELMET"))     return 3;
+            if (n.contains("CHESTPLATE")) return 8;
+            if (n.contains("LEGGINGS"))   return 6;
+            if (n.contains("BOOTS"))      return 3;
+        } else if (n.startsWith("IRON")) {
+            if (n.contains("HELMET"))     return 2;
+            if (n.contains("CHESTPLATE")) return 6;
+            if (n.contains("LEGGINGS"))   return 5;
+            if (n.contains("BOOTS"))      return 2;
+        } else if (n.startsWith("CHAIN") || n.startsWith("GOLD")) {
+            if (n.contains("HELMET"))     return 2;
+            if (n.contains("CHESTPLATE")) return 5;
+            if (n.contains("LEGGINGS"))   return 4;
+            if (n.contains("BOOTS"))      return 1;
+        } else if (n.startsWith("LEATHER")) {
+            if (n.contains("HELMET"))     return 1;
+            if (n.contains("CHESTPLATE")) return 3;
+            if (n.contains("LEGGINGS"))   return 2;
+            if (n.contains("BOOTS"))      return 1;
+        }
+        return 0;
     }
 
     // -----------------------------------------------------------------------
-    // Bot damage handling (called from BotMatchListener on AttackNpcEvent)
+    // Bot death — called from BotMatchListener
     // -----------------------------------------------------------------------
 
     /**
-     * Called when the human player successfully hits the bot NPC.
-     * Applies logical damage, knockback, and ends the round when the bot dies.
+     * Called by {@link BotMatchListener} when the NPC entity dies (HP reaches zero).
+     * Ends the current round with the human player as the winner.
      *
-     * @param attacker the player who attacked the bot
-     * @param damage   damage amount (use 0 to apply default of 1.5 hearts)
+     * @param humanWinner the human player who killed the bot
      */
-    public void onBotHit(Player attacker, float damage) {
-        if (damage <= 0)
-            damage = (float) dev.nandi0813.practice.manager.backend.ConfigManager
-                    .getDouble("MATCH-SETTINGS.BOT-DUEL.BOT-DEFAULT-DAMAGE");
-
-        botHp -= damage;
-        SoundManager.getInstance().getSound(SoundType.MATCH_PLAYER_TEMP_DEATH).play(this.getPeople());
-
-        // Apply knockback into our logical velocity — physics loop will move the NPC naturally
-        if (botNpc != null) {
-            double yaw = attacker.getLocation().getYaw();
-            double kbX = -Math.cos(Math.toRadians(yaw + 90)) * 0.4;
-            double kbZ = -Math.sin(Math.toRadians(yaw + 90)) * 0.4;
-
-            // Set velocity directly and freeze steering for KNOCKBACK_DURATION ticks
-            velX = kbX;
-            velY = 0.35;
-            velZ = kbZ;
-            knockbackTicks = KNOCKBACK_DURATION;
-
-            // Send impulse packet immediately for the visual arc
-            final double fkbX = kbX, fkbZ = kbZ;
-            Bukkit.getScheduler().runTask(ZonePractice.getInstance(),
-                    () -> { if (botNpc != null) botNpc.applyVelocity(fkbX, 0.35, fkbZ).scheduleForTracked(); });
-        }
-
-        if (botHp <= 0) {
-            botHp = 0;
-            Bukkit.getScheduler().runTask(ZonePractice.getInstance(), () -> {
-                if (status.equals(MatchStatus.LIVE)) {
-                    // Player wins this round
-                    getCurrentRound().setRoundWinner(attacker);
-                    getCurrentRound().endRound();
-                }
-            });
-        }
+    public void onBotDied(Player humanWinner) {
+        if (!status.equals(MatchStatus.LIVE)) return;
+        SoundManager.getInstance().getSound(SoundType.MATCH_PLAYER_DEATH).play(this.getPeople());
+        getCurrentRound().setRoundWinner(humanWinner);
+        getCurrentRound().endRound();
     }
 
-    /**
-     * Resets the bot's logical HP for the next round.
-     * Call this at the start of every new round.
-     */
-    public void resetBotHp() {
-        botHp = 20f;
+    /** Returns the Citizens NPC; used by {@link BotMatchListener} for identity checks. */
+    public NPC getBotNpc() {
+        return botNpc;
     }
-
-    // -----------------------------------------------------------------------
-    // Utilities
-    // -----------------------------------------------------------------------
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

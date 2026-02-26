@@ -1416,6 +1416,8 @@ MATCH:
     START:
       MATCH-STARTING: "<yellow>Match is starting in <gold>%seconds% <yellow>%secondName%."
       MATCH-STARTED: "<green>Match has been started."
+      ROUND-STARTING: "<yellow>Round is starting in <gold>%seconds% <yellow>%secondName%."
+      ROUND-STARTED: "<green>Round has been started."
     MATCH-START:
       - "<gray><st>----------------------------------------"
       - "%matchTypeName%"

@@ -5,54 +5,70 @@ import java.util.Map;
 /**
  * One game tick of observation data sent to the PvP Bot inference API.
  *
- * <p>Two construction modes:
- * <ul>
- *   <li><b>Named mode (recommended)</b> — populate {@link #values} with column name → raw value
- *       pairs. Missing columns default to 0 on the server side. Use {@code GET /col_order} to
- *       see all 52 column names.</li>
- *   <li><b>Array mode</b> — populate {@link #continuous} with exactly 52 raw floats in col_order.</li>
- * </ul>
- * {@link #categorical} is always required (46 item-vocabulary IDs).
+ * <p>Matches the wire-format defined in MODEL_DESCRIPTION.md v2.1.0.
  *
- * <p>Array sizes:
- * <ul>
- *   <li>{@code continuous[52]} — normalized floats (health, velocity, angles, armor, potions, …)</li>
- *   <li>{@code categorical[46]} — integer item-vocab IDs:
- *       helmet, chestplate, leggings, boots, main_hand, off_hand,
- *       block_below, block_looking_at, last_inv_item, last_inv_action, inv_0…inv_35</li>
- * </ul>
+ * <h3>Frame structure</h3>
+ * <pre>
+ * {
+ *   "values": {
+ *     "health": 18.0,
+ *     "max_health": 20.0,
+ *     "vel_x": -0.18,
+ *     ...  (27 keys total — see MODEL_DESCRIPTION.md for the full list)
+ *   },
+ *   "hotbar": [1, 2, 0, 0, 0, 0, 0, 0, 0, 1]   // 10 vocab IDs: inv_0..inv_8 + main_hand
+ * }
+ * </pre>
+ *
+ * <h3>Hotbar layout</h3>
+ * Indices 0-8 = hotbar slots left-to-right (inv_0 … inv_8).
+ * Index 9 = the item currently in the <em>main hand</em> (same item as the active slot,
+ * kept separately so the model can cross-reference).
+ * Empty slot → {@code 0} (AIR always maps to ID 0).
  */
 public final class GameFrame {
 
-    public static final int NUM_CONTINUOUS  = 52;
-    public static final int NUM_CATEGORICAL = 46;
+    /** Number of hotbar IDs per frame (9 slots + 1 main-hand cross-reference). */
+    public static final int HOTBAR_SIZE = 10;
 
-    /** Named raw values — keys are column names from {@code GET /col_order}. Null in array mode. */
-    public final Map<String, Double> values;
+    /**
+     * Raw game-state values keyed by field name (see MODEL_DESCRIPTION.md).
+     * The server performs all normalisation; pass raw Minecraft values directly.
+     *
+     * <p>Required keys:
+     * <pre>
+     * Numeric (17):  health, max_health, vel_x, vel_y, vel_z, yaw, pitch,
+     *                food_level, total_armor, target_distance, target_rel_x,
+     *                target_rel_y, target_rel_z, target_health,
+     *                attack_cooldown, item_use_duration, selected_slot
+     * Boolean (10):  is_on_ground, is_jumping, is_sprinting, is_sneaking,
+     *                has_speed, has_strength, has_regeneration, has_poison,
+     *                is_using_item, target_is_blocking
+     * </pre>
+     * Pass boolean fields as {@code true}/{@code false} (JSON booleans).
+     */
+    public final Map<String, Object> values;
 
-    /** 52 raw floats in canonical col_order. Null in named mode. */
-    public final float[] continuous;
+    /**
+     * Item vocabulary IDs for the 10 hotbar-related slots.
+     * Positions 0-8 correspond to inventory slots 0-8; position 9 is the main hand.
+     * Empty / unknown items use {@code 0} (AIR).
+     */
+    public final int[] hotbar;
 
-    /** 46 item-vocab IDs. Always required. */
-    public final int[] categorical;
-
-    /** Named-value constructor (recommended). */
-    public GameFrame(Map<String, Double> values, int[] categorical) {
-        if (categorical.length != NUM_CATEGORICAL)
-            throw new IllegalArgumentException("categorical must have " + NUM_CATEGORICAL + " elements");
-        this.values      = values;
-        this.continuous  = null;
-        this.categorical = categorical;
-    }
-
-    /** Array constructor — supply exactly {@value #NUM_CONTINUOUS} raw floats. */
-    public GameFrame(float[] continuous, int[] categorical) {
-        if (continuous.length != NUM_CONTINUOUS)
-            throw new IllegalArgumentException("continuous must have " + NUM_CONTINUOUS + " elements");
-        if (categorical.length != NUM_CATEGORICAL)
-            throw new IllegalArgumentException("categorical must have " + NUM_CATEGORICAL + " elements");
-        this.values      = null;
-        this.continuous  = continuous;
-        this.categorical = categorical;
+    /**
+     * Constructs a frame with a named-value map and a hotbar ID array.
+     *
+     * @param values raw game-state values (27 keys — see field javadoc)
+     * @param hotbar exactly {@value #HOTBAR_SIZE} item-vocabulary IDs
+     * @throws IllegalArgumentException if {@code hotbar} does not have exactly
+     *                                  {@value #HOTBAR_SIZE} elements
+     */
+    public GameFrame(Map<String, Object> values, int[] hotbar) {
+        if (hotbar.length != HOTBAR_SIZE)
+            throw new IllegalArgumentException(
+                    "hotbar must have exactly " + HOTBAR_SIZE + " elements, got " + hotbar.length);
+        this.values = values;
+        this.hotbar = hotbar;
     }
 }
