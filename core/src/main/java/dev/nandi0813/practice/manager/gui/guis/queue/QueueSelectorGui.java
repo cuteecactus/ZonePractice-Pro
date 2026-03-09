@@ -25,6 +25,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -101,7 +102,7 @@ public abstract class QueueSelectorGui extends GUI {
                 ConfigManager.getInt(queuePath + ".FIRST-CATEGORY.SIZE"),
                 GUIFile.getGuiItem(guiPath + ".FIRST-CATEGORY.ICONS.FILLER-ITEM").get(),
                 GUIFile.getGuiItem(guiPath + ".FIRST-CATEGORY.ICONS.LADDER"),
-                queuePath + ".FIRST-CATEGORY.LADDERS",
+                queuePath + ".FIRST-CATEGORY.LADDER-SLOTS",
                 firstCategoryLadderSlots,
                 secondCategoryEnabled ? ConfigManager.getInt(queuePath + ".FIRST-CATEGORY.GO-TO-SECOND-CATEGORY-SLOT") : -1,
                 secondCategoryEnabled ? GUIFile.getGuiItem(guiPath + ".FIRST-CATEGORY.ICONS.GO-TO-SECOND-CATEGORY").get() : null
@@ -114,7 +115,7 @@ public abstract class QueueSelectorGui extends GUI {
                     ConfigManager.getInt(queuePath + ".SECOND-CATEGORY.SIZE"),
                     GUIFile.getGuiItem(guiPath + ".SECOND-CATEGORY.ICONS.FILLER-ITEM").get(),
                     GUIFile.getGuiItem(guiPath + ".SECOND-CATEGORY.ICONS.LADDER"),
-                    queuePath + ".SECOND-CATEGORY.LADDERS",
+                    queuePath + ".SECOND-CATEGORY.LADDER-SLOTS",
                     secondCategoryLadderSlots,
                     ConfigManager.getInt(queuePath + ".SECOND-CATEGORY.BACK-TO-FIRST-CATEGORY-SLOT"),
                     GUIFile.getGuiItem(guiPath + ".SECOND-CATEGORY.ICONS.GO-BACK-TO-FIRST-CATEGORY").get()
@@ -289,6 +290,7 @@ public abstract class QueueSelectorGui extends GUI {
             // Apply only the LB lore (which is static) but NOT %in_queue%/%in_fight%
             String lbFormat = GUIFile.getString(guiPath + ".LB-FORMAT");
             rawTemplate.setLore(QueueGuiUtil.replaceLore(lbFormat, rawTemplate.getLore(), ladder));
+            rawTemplate.replace("%weight_class%", getWeightClass().getName());
             rawTemplate.setAmount(1);
             pageTemplates.put(slot, rawTemplate.get());
         }
@@ -323,6 +325,8 @@ public abstract class QueueSelectorGui extends GUI {
 
         String lbFormat = GUIFile.getString(guiPath + ".LB-FORMAT");
         icon.setLore(QueueGuiUtil.replaceLore(lbFormat, icon.getLore(), ladder));
+
+        icon.replace("%weight_class%", getWeightClass().getName());
 
         if (duelMatchSize > 0 && duelMatchSize <= 64) {
             icon.setAmount(duelMatchSize);
@@ -376,13 +380,23 @@ public abstract class QueueSelectorGui extends GUI {
     // -------------------------------------------------------------------------
 
     private Map<NormalLadder, Integer> getTempLadderSlots(final String path, int size) {
-        final Map<NormalLadder, Integer> tempLadderSlots = new HashMap<>();
+        final Map<NormalLadder, Integer> tempLadderSlots = new LinkedHashMap<>();
 
-        for (String ladderName : ConfigManager.getConfigList(path)) {
+        for (String entry : ConfigManager.getList(path)) {
+            String[] parts = entry.split("::");
+            if (parts.length != 2) continue;
+
+            String ladderName = parts[0].trim();
+            int slot;
+            try {
+                slot = Integer.parseInt(parts[1].trim());
+            } catch (NumberFormatException e) {
+                continue;
+            }
+
             NormalLadder ladder = LadderManager.getInstance().getLadder(ladderName);
 
             if (ladder != null && isValidLadder(ladder) && ladder.getMatchTypes().contains(MatchType.DUEL)) {
-                int slot = ConfigManager.getInt(path + "." + ladderName);
 
                 if (slot >= 0 && slot < size) {
                     tempLadderSlots.put(ladder, slot);

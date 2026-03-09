@@ -1,4 +1,4 @@
-VERSION: 15
+VERSION: 17
 
 # Mysql database setup.
 MYSQL-DATABASE:
@@ -38,33 +38,33 @@ QUEUE:
       FIRST-CATEGORY:
         SIZE: 5
         GO-TO-SECOND-CATEGORY-SLOT: 44
-        LADDERS:
-          BATTLERUSH: 10
-          BEDWARS: 11
-          BOXING: 12
-          BRIDGES: 14
-          FIREBALL: 15
-          GAPPLE: 16
-          NODEBUFF: 20
-          MACE: 21
-          SUMO: 22
-          BUILDUHC: 23
-          PEARLFIGHT: 24
-          CRYSTAL: 30
-          SPEAR: 32
+        LADDER-SLOTS:
+          - "BATTLERUSH::10"
+          - "BEDWARS::11"
+          - "BOXING::12"
+          - "BRIDGES::14"
+          - "FIREBALL::15"
+          - "GAPPLE::16"
+          - "NODEBUFF::20"
+          - "MACE::21"
+          - "SUMO::22"
+          - "BUILDUHC::23"
+          - "PEARLFIGHT::24"
+          - "CRYSTAL::30"
+          - "SPEAR::32"
       SECOND-CATEGORY:
         ENABLED: true
         BACK-TO-FIRST-CATEGORY-SLOT: 35
         SIZE: 4
-        LADDERS:
-          ARCHER: 10
-          AXE: 11
-          DEBUFF: 12
-          SG: 14
-          SKYWARS: 15
-          SOUP: 16
-          SPLEEF: 20
-          VANILLA: 24
+        LADDER-SLOTS:
+          - "ARCHER::10"
+          - "AXE::11"
+          - "DEBUFF::12"
+          - "SG::14"
+          - "SKYWARS::15"
+          - "SOUP::16"
+          - "SPLEEF::20"
+          - "VANILLA::24"
   RANKED:
     MAX-QUEUE-TIME: 300 # In sec.
     GUI-UPDATE-MINUTE: 1
@@ -78,30 +78,30 @@ QUEUE:
       FIRST-CATEGORY:
         SIZE: 5
         GO-TO-SECOND-CATEGORY-SLOT: 44
-        LADDERS:
-          BATTLERUSH: 10
-          BEDWARS: 11
-          BOXING: 12
-          BRIDGES: 14
-          FIREBALL: 15
-          GAPPLE: 16
-          NODEBUFF: 20
-          MACE: 21
-          SUMO: 22
-          BUILDUHC: 23
-          PEARLFIGHT: 24
-          CRYSTAL: 30
-          SPEAR: 32
+        LADDER-SLOTS:
+          - "BATTLERUSH::10"
+          - "BEDWARS::11"
+          - "BOXING::12"
+          - "BRIDGES::14"
+          - "FIREBALL::15"
+          - "GAPPLE::16"
+          - "NODEBUFF::20"
+          - "MACE::21"
+          - "SUMO::22"
+          - "BUILDUHC::23"
+          - "PEARLFIGHT::24"
+          - "CRYSTAL::30"
+          - "SPEAR::32"
       SECOND-CATEGORY:
         ENABLED: true
         BACK-TO-FIRST-CATEGORY-SLOT: 18
         SIZE: 3
-        LADDERS:
-          DEBUFF: 11
-          SG: 12
-          SKYWARS: 13
-          SOUP: 14
-          SPLEEF: 15
+        LADDER-SLOTS:
+          - "DEBUFF::11"
+          - "SG::12"
+          - "SKYWARS::13"
+          - "SOUP::14"
+          - "SPLEEF::15"
 #
 # Admin settings
 ADMIN-SETTINGS:
@@ -195,6 +195,7 @@ MATCH-SETTINGS:
       - "REGENERATION::20::2"
   REMOVE-EMPTY-BOTTLE: true # Removes empty potion bottles after the player use it.
   DUEL:
+    RIGHT-CLICK-TO-DUEL: true # When enabled, players can right-click another player in the lobby to send them a duel request.
     INVITATION-EXPIRY: 60 # After the seconds, the duel request will expire.
     ROUND-SELECTOR:
       MAX: 10
@@ -205,15 +206,15 @@ MATCH-SETTINGS:
   FIREWORK-ROCKET:
     COOLDOWN: 1 # Cooldown in seconds for using firework rockets with elytra. Default is 1 second.
   FIREBALL-FIGHT: # These are multiplier values, so please test what is optimal for you and don't change them too much at once or the difference will multiply.
-    FIREBALL-SPEED: 1.3
-    FIREBALL-YIELD: 2
+    FIREBALL-SPEED: 1.0
+    FIREBALL-YIELD: 1.8
     EXPLOSION:
       TNT:
-        HORIZONTAL: 1.9
-        VERTICAL: 2.1
+        HORIZONTAL: 1.4
+        VERTICAL: 1.3
       FIREBALL:
-        HORIZONTAL: 1.8
-        VERTICAL: 1.7
+        HORIZONTAL: 1.6
+        VERTICAL: 1.4
   BOXING:
     CUSTOM-ATTACK-COOLDOWN:
       ENABLED: true
