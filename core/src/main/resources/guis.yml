@@ -1,4 +1,4 @@
-VERSION: 13
+VERSION: 17
 
 GENERAL-FILLER-ITEM:
   NAME: " "
@@ -576,6 +576,7 @@ GUIS:
             - ""
             - "&eBuild: &f%build_status%"
             - "&eRe-Kit After Kill: &f%rekit_after_kill%"
+            - "&eHealth Reset On Kill: &f%health_reset_on_kill%"
             - "&eLobby After Death: &f%lobby_after_death%"
             - "&eLadders: &f%ladders%"
             - "&ePlayers: &f%players%"
@@ -1325,8 +1326,8 @@ GUIS:
               - "&e&lClick here &7to open the settings gui."
               - ""
               - "&c&lNote: &7You can change the build setting,"
-              - "&7re-kit after kill setting and the lobby after"
-              - "&7death setting."
+              - "&7re-kit after kill, health reset on kill"
+              - "&7and the lobby after death setting."
           STATUS:
             ENABLED:
               NAME: "&7Status: &aEnabled"
@@ -1443,6 +1444,27 @@ GUIS:
                 - ""
                 - "&e&lClick here &7to &aenable &7the"
                 - "&2re-kit after kill &7in the arena."
+          HEALTH-RESET-ON-KILL:
+            ENABLED:
+              NAME: "&7Health Reset On Kill: &aEnabled"
+              MATERIAL: GOLDEN_APPLE
+              LORE:
+                - ""
+                - "&eAfter a player kills somebody"
+                - "&ethey are fully healed."
+                - ""
+                - "&e&lClick here &7to &cdisable &7the"
+                - "&2health reset on kill &7in the arena."
+            DISABLED:
+              NAME: "&7Health Reset On Kill: &cDisabled"
+              MATERIAL: RED_STAINED_GLASS_PANE
+              LORE:
+                - ""
+                - "&eAfter a player kills somebody"
+                - "&ethey are fully healed."
+                - ""
+                - "&e&lClick here &7to &aenable &7the"
+                - "&2health reset on kill &7in the arena."
           LOBBY-AFTER-DEATH:
             ENABLED:
               NAME: "&7Lobby After Death: &aEnabled"
@@ -1569,6 +1591,7 @@ GUIS:
               - ""
               - "&7You can set the arenas icon by using the"
               - "&7&l/arena set icon %arenaName% &7command."
+              - ""
               - "&c&lNote: &7You have to hold the item in your hand"
               - "&7and name it first with the &7&l/prac rename &7command."
           STATUS:
@@ -2396,7 +2419,8 @@ GUIS:
               - "&6Event Information:"
               - " &7» &eState: %state%"
               - ""
-              - "&b&lClick here &bto open event settings."
+              - "&b&lLEFT-CLICK &bto open event settings."
+              - "&a&lRIGHT-CLICK &ato teleport to the event."
       EVENT-MAIN:
         TITLE: "%eventName% &8- Event"
         ICONS:
@@ -2820,3 +2844,323 @@ GUIS:
               - "&7Click here to manually"
               - "&7save the %data% data."
               - "&8&m------------------------"
+  COSMETICS:
+    MAIN-TITLE: "&8Armor Cosmetics"
+    # Error messages for permission denied
+    PERMISSION-DENIED-MESSAGE: "<red>You do not have permission for the selected armor tier."
+    TIER-PERMISSION-DENIED-MESSAGE: "<red>You do not have permission for this armor tier."
+    PATTERN-PERMISSION-DENIED-MESSAGE: "<red>You do not have permission to use this trim pattern."
+    MATERIAL-PERMISSION-DENIED-MESSAGE: "<red>You do not have permission to use this trim material."
+    NO-TIER-PERMISSION-MESSAGE: "<red>You do not have permission for any armor tier."
+    # Armor Tier customization
+    ARMOR-TIERS:
+      LEATHER:
+        DISPLAY-NAME: "Leather"
+        HELMET-MATERIAL: LEATHER_HELMET
+        CHESTPLATE-MATERIAL: LEATHER_CHESTPLATE
+        LEGGINGS-MATERIAL: LEATHER_LEGGINGS
+        BOOTS-MATERIAL: LEATHER_BOOTS
+      GOLD:
+        DISPLAY-NAME: "Gold"
+        HELMET-MATERIAL: GOLDEN_HELMET
+        CHESTPLATE-MATERIAL: GOLDEN_CHESTPLATE
+        LEGGINGS-MATERIAL: GOLDEN_LEGGINGS
+        BOOTS-MATERIAL: GOLDEN_BOOTS
+      IRON:
+        DISPLAY-NAME: "Iron"
+        HELMET-MATERIAL: IRON_HELMET
+        CHESTPLATE-MATERIAL: IRON_CHESTPLATE
+        LEGGINGS-MATERIAL: IRON_LEGGINGS
+        BOOTS-MATERIAL: IRON_BOOTS
+      DIAMOND:
+        DISPLAY-NAME: "Diamond"
+        HELMET-MATERIAL: DIAMOND_HELMET
+        CHESTPLATE-MATERIAL: DIAMOND_CHESTPLATE
+        LEGGINGS-MATERIAL: DIAMOND_LEGGINGS
+        BOOTS-MATERIAL: DIAMOND_BOOTS
+      NETHERITE:
+        DISPLAY-NAME: "Netherite"
+        HELMET-MATERIAL: NETHERITE_HELMET
+        CHESTPLATE-MATERIAL: NETHERITE_CHESTPLATE
+        LEGGINGS-MATERIAL: NETHERITE_LEGGINGS
+        BOOTS-MATERIAL: NETHERITE_BOOTS
+    ICONS:
+      HELMET-ICON:
+        NAME: "&eHelmet"
+        MATERIAL: LEATHER_HELMET
+        LORE:
+          - ""
+          - "&7Click here to customize"
+          - "&7armor trim patterns and materials"
+          - "&7for your helmet."
+          - ""
+      CHESTPLATE-ICON:
+        NAME: "&eChestplate"
+        MATERIAL: LEATHER_CHESTPLATE
+        LORE:
+          - ""
+          - "&7Click here to customize"
+          - "&7armor trim patterns and materials"
+          - "&7for your chestplate."
+          - ""
+      LEGGINGS-ICON:
+        NAME: "&eLeggings"
+        MATERIAL: LEATHER_LEGGINGS
+        LORE:
+          - ""
+          - "&7Click here to customize"
+          - "&7armor trim patterns and materials"
+          - "&7for your leggings."
+          - ""
+      BOOTS-ICON:
+        NAME: "&eBoots"
+        MATERIAL: LEATHER_BOOTS
+        LORE:
+          - ""
+          - "&7Click here to customize"
+          - "&7armor trim patterns and materials"
+          - "&7for your boots."
+          - ""
+      SHIELD-ICON:
+        NAME: "&eShield"
+        MATERIAL: SHIELD
+        LORE:
+          - ""
+          - "&7Click here to customize"
+          - "&7the trim pattern for your shield."
+          - ""
+      INFO-ICON:
+        NAME: "&bCosmetics Information"
+        MATERIAL: BOOK
+        LORE:
+          - "&8&m------------------------"
+          - "&7Unlocked Patterns: &b%pattern_unlocked%&7/&b%pattern_total%"
+          - "&7Unlocked Materials: &6%material_unlocked%&7/&6%material_total%"
+          - ""
+          - "&7Select a category item to edit"
+          - "&7your active trim cosmetics."
+          - "&8&m------------------------"
+      BACK-TO:
+        NAME: "&cBack"
+        MATERIAL: ARROW
+    # Dynamically built lore templates for armor cosmetics
+    ARMOR-PREVIEW-LORE:
+      - "&7Tier: &e%tier%"
+      - "&7Active Pattern: %pattern%"
+      - "&7Active Material: %material%"
+      - ""
+      - "&eLeft-Click to customize"
+      - "&cRight-Click to reset"
+    TIER-TOGGLE-LORE:
+      - ""
+      - "&7Left-click: &cPrevious tier"
+      - "&7Right-click: &aNext tier"
+    SUB-TITLE: "&8Customize %armor% Cosmetics"
+    # Armor Piece Hub Configuration
+    ARMOR-PIECE-HUB:
+      INVENTORY-ROWS: 4
+      SLOTS:
+        BACK: 27
+        PREVIEW: 13
+        PATTERN-MENU: 20
+        MATERIAL-MENU: 24
+      PREVIEW-ITEM:
+        NAME: "&eCurrent Preview"
+      PATTERN-SELECTION-BUTTON:
+        NAME: "&bPattern Selection"
+        LORE:
+          - "&7Open all available trim patterns."
+          - "&eClick to open."
+        DEFAULT-MATERIAL: SMITHING_TABLE
+      MATERIAL-SELECTION-BUTTON:
+        NAME: "&6Material Selection"
+        LORE:
+          - "&7Open all available trim materials."
+          - "&eClick to open."
+        DEFAULT-MATERIAL: ANVIL
+    # Pattern Selection GUI Configuration
+    PATTERN-SELECTION:
+      INVENTORY-ROWS: 5
+      BACK-SLOT: 36
+      START-SLOT: 10
+      INVENTORY-TITLE: "&8Select Pattern - %armor%"
+      PATTERN-ITEM:
+        NAME: "&b%pattern_name% Pattern"
+        LORE:
+          - "&7Status: %state%"
+          - "&7Access: %access%"
+    # Material Selection GUI Configuration
+    MATERIAL-SELECTION:
+      INVENTORY-ROWS: 5
+      BACK-SLOT: 36
+      START-SLOT: 10
+      INVENTORY-TITLE: "&8Select Material - %armor%"
+      MATERIAL-ITEM:
+        NAME: "&6%material_name% Material"
+        LORE:
+          - "&7Status: %state%"
+          - "&7Access: %access%"
+      MATERIAL-ICONS:
+        LAPIS: LAPIS_LAZULI
+        AMETHYST: AMETHYST_SHARD
+        RESIN: RESIN_BRICK
+    HUB:
+      TITLE: "&8✦ Cosmetics"
+      BUTTONS:
+        ARMOR-TRIMS:
+          NAME: "&6✦ Armor Trims"
+          MATERIAL: DIAMOND_CHESTPLATE
+          GLOW: true
+          LORE:
+            - ""
+            - "&7Customize your armor tier,"
+            - "&7trim patterns and materials."
+            - ""
+            - "&eClick to open."
+        SHIELD:
+          NAME: "&9✦ Shield"
+          MATERIAL: SHIELD
+          GLOW: false
+          LORE:
+            - ""
+            - "&7Design your shield with any"
+            - "&7color and pattern combination."
+            - "&7Save multiple layouts."
+            - ""
+            - "&eClick to open."
+        KILL-EFFECTS:
+          NAME: "&c✦ Death Effects"
+          MATERIAL: BLAZE_POWDER
+          GLOW: false
+          LORE:
+            - ""
+            - "&7Choose a particle effect that"
+            - "&7plays when you kill someone."
+            - ""
+            - "&eClick to open."
+    DEATH-EFFECTS:
+      TITLE: "&8✦ Death Effects"
+      NO-PERMISSION-MESSAGE: "<red>You don't have permission for this death effect!"
+      SELECTED-PREFIX: "&a✔ "
+      UNLOCKED-PREFIX: "&e"
+      LOCKED-PREFIX: "&c🔒 "
+      CLICK-TO-SELECT: "&eClick to select."
+      CLICK-TO-DESELECT: "&7Click to deselect."
+      NO-PERMISSION-LORE: "&cRequires: &7%permission%"
+      DEFAULT-LORE:
+        - ""
+        - "&7Status: %status%"
+        - ""
+      ENTRIES:
+        NONE:
+          DISPLAY-NAME: "None"
+          ICON: BARRIER
+          LORE:
+            - ""
+            - "&7No kill effect."
+            - "&7Status: %status%"
+            - ""
+        FLAME:
+          DISPLAY-NAME: "Flame"
+          ICON: BLAZE_POWDER
+          LORE:
+            - ""
+            - "&7Bursts of fire on kill."
+            - "&7Status: %status%"
+            - ""
+        LIGHTNING:
+          DISPLAY-NAME: "Lightning"
+          ICON: LIGHTNING_ROD
+          LORE:
+            - ""
+            - "&7A lightning strike on kill."
+            - "&7Status: %status%"
+            - ""
+        FIREWORK:
+          DISPLAY-NAME: "Firework"
+          ICON: FIREWORK_ROCKET
+          LORE:
+            - ""
+            - "&7Fireworks burst on kill."
+            - "&7Status: %status%"
+            - ""
+        EXPLOSION:
+          DISPLAY-NAME: "Explosion"
+          ICON: TNT
+          LORE:
+            - ""
+            - "&7Smoke & fire explosion on kill."
+            - "&7Status: %status%"
+            - ""
+        BLOOD:
+          DISPLAY-NAME: "Blood"
+          ICON: REDSTONE
+          LORE:
+            - ""
+            - "&7Red dust particles on kill."
+            - "&7Status: %status%"
+            - ""
+        ENCHANT:
+          DISPLAY-NAME: "Enchant"
+          ICON: ENCHANTING_TABLE
+          LORE:
+            - ""
+            - "&7Magic enchant particles on kill."
+            - "&7Status: %status%"
+            - ""
+        ENDER:
+          DISPLAY-NAME: "Ender"
+          ICON: ENDER_PEARL
+          LORE:
+            - ""
+            - "&7Ender portal particles on kill."
+            - "&7Status: %status%"
+            - ""
+        HEARTS:
+          DISPLAY-NAME: "Hearts"
+          ICON: PINK_DYE
+          LORE:
+            - ""
+            - "&7Floating hearts on kill."
+            - "&7Status: %status%"
+            - ""
+        ICE:
+          DISPLAY-NAME: "Ice"
+          ICON: PACKED_ICE
+          LORE:
+            - ""
+            - "&7Snowflake & ice particles on kill."
+            - "&7Status: %status%"
+            - ""
+    # ── Shield Cosmetics ──────────────────────────────────────────────────────
+    SHIELD:
+      NO-PERMISSION-MESSAGE: "<red>You don't have permission to use shield cosmetics!"
+      # Layout list GUI
+      LAYOUTS:
+        TITLE: "&8\u2756 Shield Layouts"
+        NAME-TITLE: "Layout Name"
+        RENAME-TITLE: "Rename Layout"
+        LIMIT-REACHED: "<red>You've reached your layout limit! Get a higher rank for more."
+        DELETED-MESSAGE: "<green>Layout deleted."
+        NEW-BUTTON:
+          NAME: "&aNew Layout"
+      # Editor GUI
+      EDITOR:
+        TITLE: "&8Editing: &e%name%"
+        APPLIED-MESSAGE: "<green>Shield layout applied!"
+        UNAPPLIED-MESSAGE: "<gray>Shield cosmetic removed."
+        ADD-LAYER:
+          NAME: "&aAdd Layer"
+        MAX-LAYERS:
+          NAME: "&cMax Layers Reached"
+          MESSAGE: "<red>Maximum of 6 layers reached!"
+        REMOVE-LAYER:
+          NAME: "&cRemove Top Layer"
+      # Color picker GUI
+      COLOR-PICKER:
+        BASE-TITLE: "&8Pick Base Color"
+        LAYER-TITLE: "&8Pick Layer Color"
+      # Pattern picker GUI
+      PATTERN-PICKER:
+        TITLE: "&8Pick Pattern"
+        APPLIED-MESSAGE: "<green>Layer applied!"

@@ -1,26 +1,16 @@
 package dev.nandi0813.practice;
 
 import com.github.retrooper.packetevents.PacketEvents;
-import dev.nandi0813.practice.command.accept.AcceptCommand;
 import dev.nandi0813.practice.command.arena.ArenaCommand;
-import dev.nandi0813.practice.command.division.DivisionsCommand;
-import dev.nandi0813.practice.command.duel.DuelCommand;
 import dev.nandi0813.practice.command.event.EventCommand;
 import dev.nandi0813.practice.command.ffa.FFACommand;
-import dev.nandi0813.practice.command.hologram.HologramCommand;
 import dev.nandi0813.practice.command.ladder.LadderCommand;
-import dev.nandi0813.practice.command.matchstats.MatchStatsCommand;
 import dev.nandi0813.practice.command.party.PartyCommand;
 import dev.nandi0813.practice.command.practice.PracticeCommand;
-import dev.nandi0813.practice.command.preview.PreviewCommand;
 import dev.nandi0813.practice.command.privatemessage.MessageCommand;
 import dev.nandi0813.practice.command.privatemessage.ReplyCommand;
-import dev.nandi0813.practice.command.settings.SettingsCommand;
-import dev.nandi0813.practice.command.setup.SetupCommand;
 import dev.nandi0813.practice.command.singlecommands.*;
-import dev.nandi0813.practice.command.spectate.SpectateCommand;
 import dev.nandi0813.practice.command.staff.StaffCommand;
-import dev.nandi0813.practice.command.statistics.StatisticsCommand;
 import dev.nandi0813.practice.listener.*;
 import dev.nandi0813.practice.manager.arena.ArenaManager;
 import dev.nandi0813.practice.manager.arena.listener.ArenaCopyUtilListener;
@@ -47,6 +37,7 @@ import dev.nandi0813.practice.manager.leaderboard.hologram.HologramManager;
 import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.playerkit.PlayerKitManager;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
+import dev.nandi0813.practice.manager.profile.cosmetics.CosmeticsPermissionManager;
 import dev.nandi0813.practice.manager.server.ServerManager;
 import dev.nandi0813.practice.manager.sidebar.SidebarManager;
 import dev.nandi0813.practice.util.*;
@@ -118,6 +109,7 @@ public final class ZonePractice extends JavaPlugin {
         DivisionManager.getInstance().getData();
         ArenaWorldUtil.createArenaWorld();
         BackendManager.createFile(this);
+        CosmeticsPermissionManager.registerAllPermissions();
 
         ZonePracticeApiImpl.setup();
         StartUpUtil.loadStartUpProgressMap();
@@ -340,6 +332,11 @@ public final class ZonePractice extends JavaPlugin {
         if (server.getPluginCommand("ignorequeue") != null) {
             server.getPluginCommand("ignorequeue").setExecutor(ignoreQueueCommand);
             server.getPluginCommand("ignorequeue").setTabCompleter(ignoreQueueCommand);
+        }
+
+        CosmeticsCommand cosmeticsCommand = new CosmeticsCommand();
+        if (server.getPluginCommand("cosmetics") != null) {
+            server.getPluginCommand("cosmetics").setExecutor(cosmeticsCommand);
         }
 
         if (ConfigManager.getBoolean("CHAT.PRIVATE-CHAT-ENABLED")) {

@@ -1,4 +1,4 @@
-package dev.nandi0813.practice.command.duel;
+package dev.nandi0813.practice.command.singlecommands;
 
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.duel.DuelManager;
@@ -96,7 +96,14 @@ public class DuelCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 1) {
             for (Player target : Bukkit.getOnlinePlayers()) {
-                if (player.equals(target)) continue;
+                if (player.equals(target)) {
+                    continue;
+                }
+
+                Profile targetProfile = ProfileManager.getInstance().getProfile(target);
+                if (!targetProfile.getStatus().equals(ProfileStatus.LOBBY) && !targetProfile.getStatus().equals(ProfileStatus.EDITOR) && !targetProfile.getStatus().equals(ProfileStatus.SPECTATE)) {
+                    continue;
+                }
 
                 arguments.add(target.getName());
             }

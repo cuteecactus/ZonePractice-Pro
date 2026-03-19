@@ -167,9 +167,10 @@ public class FFAListener implements Listener {
 
     private static final boolean DISPLAY_ARROW_HIT = ConfigManager.getBoolean("FFA.DISPLAY-ARROW-HIT-HEALTH");
 
-    protected static void arrowDisplayHearth(Player shooter, Player target, double finalDamage) {
+    protected static void arrowDisplayHearth(Player shooter, Player target, double finalDamage, EntityDamageByEntityEvent event) {
         if (!DISPLAY_ARROW_HIT) return;
         if (shooter == null || target == null) return;
+        if (event.isCancelled()) return;
 
         FFA ffa = FFAManager.getInstance().getFFAByPlayer(shooter);
         if (ffa == null) return;
@@ -373,10 +374,7 @@ public class FFAListener implements Listener {
             return;
         }
 
-        Player killer = null;
-        if (damageSource.getCausingEntity() instanceof Entity damageEntity) {
-            killer = FightUtil.getKiller(damageEntity);
-        }
+        Player killer = resolveKiller(player, ffa, damageSource);
 
         DeathCause cause = FightUtil.convert(damageSource.getDamageType());
         ffa.killPlayer(player, killer, cause.getMessage().replace("%killer%", killer != null ? killer.getName() : "Unknown"));
@@ -385,6 +383,30 @@ public class FFAListener implements Listener {
             Statistic statistic = ffa.getStatistics().get(killer);
             statistic.setKills(statistic.getKills() + 1);
         }
+    }
+
+    private Player resolveKiller(Player victim, FFA ffa, DamageSource damageSource) {
+        Player killer = null;
+
+        if (damageSource.getCausingEntity() instanceof Entity damageEntity) {
+            killer = FightUtil.getKiller(damageEntity);
+        }
+
+        // Bukkit keeps killer attribution for recent direct/projectile PvP.
+        if (killer == null) {
+            killer = victim.getKiller();
+        }
+
+        // Fallback for delayed environmental deaths (e.g. fatal fall after knockback).
+        if (killer == null) {
+            killer = ffa.getLastAttacker(victim);
+        }
+
+        if (killer != null && !ffa.getPlayers().containsKey(killer)) {
+            return null;
+        }
+
+        return killer;
     }
 
     @EventHandler
@@ -408,7 +430,7 @@ public class FFAListener implements Listener {
                 attacker = shooter;
 
                 if (projectile instanceof Arrow) {
-                    arrowDisplayHearth(shooter, target, e.getFinalDamage());
+                    arrowDisplayHearth(shooter, target, e.getFinalDamage(), e);
                 }
             }
         }

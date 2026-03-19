@@ -1,4 +1,4 @@
-VERSION: 19
+VERSION: 22
 
 # Mysql database setup.
 MYSQL-DATABASE:
@@ -245,6 +245,7 @@ MATCH-SETTINGS:
 FFA:
   ROLLBACK:
     SECONDS: 300 # After the seconds, the arena will be reseted back to its original state (only on build arenas).
+  HEALTH-RESET-ON-KILL: false # Default for newly created FFA arenas. If enabled, killers are fully healed on kill.
   DISPLAY-ARROW-HIT-HEALTH: true # If true, the player will see the health of the player they hit.
   ENDER-PEARL-EXP-BAR: true # If true, the ender pearl cooldown will be displayed on the exp bar.
   ALLOW-DESTROYABLE-BLOCK: true # If true, player can destroy the fixed blocks in the arena that their ladder has.
@@ -263,7 +264,6 @@ PARTY:
   SETTINGS:
     MAX-PARTY-MEMBERS:
       DEFAULT: 6 # Maximum party members, if the owner doesn't have permission to change it.
-      PERMISSION: 20 # The maximum limit the party leader can set for the party.
     DEFAULT:
       PUBLIC-PARTY: false
       ALL-INVITE: false
@@ -504,6 +504,15 @@ PLAYER:
     ENABLED: true
     DAYS: 30 # After this number of days, the inactive player profiles will be deleted.
   SETTINGS-DELAY: 3 # Sec between settings can be changed. It can be bypassed.
+  LOBBY-PROTECTION:
+    allow-velocity: false # player don't get damaged but they get knocked back
+    allow-damage: false
+    allow-inventory-interact: false
+    allow-item-drop: false
+    allow-item-pickup: false
+    allow-hunger: false
+    allow-block-break: false
+    allow-block-place: false
   LOBBY-NAMETAG:
     ENABLED: true
   NAMETAG-MANAGEMENT:

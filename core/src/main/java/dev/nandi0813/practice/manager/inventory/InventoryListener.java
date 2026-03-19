@@ -31,6 +31,8 @@ import org.bukkit.inventory.ItemStack;
 
 public class InventoryListener implements Listener {
 
+    private static final String LOBBY_PROTECTION_PATH = "PLAYER.LOBBY-PROTECTION.";
+
     @EventHandler
     public void onPlayerInteractWithInvItem(PlayerInteractEvent e) {
         Player player = e.getPlayer();
@@ -144,18 +146,46 @@ public class InventoryListener implements Listener {
     @EventHandler
     public void onBlockBreak(BlockBreakEvent e) {
         Player player = e.getPlayer();
+        Profile profile = ProfileManager.getInstance().getProfile(player);
+        ProfileStatus profileStatus = profile.getStatus();
 
-        if (ServerManager.getInstance().getInWorld().containsKey(player) && ServerManager.getInstance().getInWorld().get(player).equals(WorldEnum.LOBBY)) {
-            e.setCancelled(!player.hasPermission("zpp.admin"));
+        if (isLobbyStatus(profileStatus)) {
+            if (!isLobbyProtectionAllowed("allow-block-break") && !player.hasPermission("zpp.admin")) {
+                e.setCancelled(true);
+            }
+            return;
+        }
+
+        switch (profileStatus) {
+            case QUEUE:
+            case STAFF_MODE:
+            case CUSTOM_EDITOR:
+            case EDITOR:
+                e.setCancelled(true);
+                break;
         }
     }
 
     @EventHandler
     public void onBlockPlace(BlockPlaceEvent e) {
         Player player = e.getPlayer();
+        Profile profile = ProfileManager.getInstance().getProfile(player);
+        ProfileStatus profileStatus = profile.getStatus();
 
-        if (ServerManager.getInstance().getInWorld().containsKey(player) && ServerManager.getInstance().getInWorld().get(player).equals(WorldEnum.LOBBY)) {
-            e.setCancelled(!player.hasPermission("zpp.admin"));
+        if (isLobbyStatus(profileStatus)) {
+            if (!isLobbyProtectionAllowed("allow-block-place") && !player.hasPermission("zpp.admin")) {
+                e.setCancelled(true);
+            }
+            return;
+        }
+
+        switch (profileStatus) {
+            case QUEUE:
+            case STAFF_MODE:
+            case CUSTOM_EDITOR:
+            case EDITOR:
+                e.setCancelled(true);
+                break;
         }
     }
 
@@ -165,15 +195,18 @@ public class InventoryListener implements Listener {
         Profile profile = ProfileManager.getInstance().getProfile(player);
         ProfileStatus profileStatus = profile.getStatus();
 
-        if (!player.hasPermission("zpp.admin") && profileStatus.equals(ProfileStatus.LOBBY))
-            e.setCancelled(true);
-        else {
-            switch (profileStatus) {
-                case QUEUE:
-                case STAFF_MODE:
-                    e.setCancelled(true);
-                    break;
+        if (isLobbyStatus(profileStatus)) {
+            if (!isLobbyProtectionAllowed("allow-inventory-interact") && !player.hasPermission("zpp.admin")) {
+                e.setCancelled(true);
             }
+            return;
+        }
+
+        switch (profileStatus) {
+            case QUEUE:
+            case STAFF_MODE:
+                e.setCancelled(true);
+                break;
         }
     }
 
@@ -185,6 +218,10 @@ public class InventoryListener implements Listener {
 
         switch (profileStatus) {
             case LOBBY:
+                if (!isLobbyProtectionAllowed("allow-item-drop")) {
+                    e.setCancelled(!player.hasPermission("zpp.admin"));
+                }
+                break;
             case QUEUE:
             case STAFF_MODE:
                 e.setCancelled(!player.hasPermission("zpp.admin"));
@@ -207,17 +244,20 @@ public class InventoryListener implements Listener {
             return;
         }
 
-        if (!player.hasPermission("zpp.admin") && profileStatus.equals(ProfileStatus.LOBBY))
-            e.setCancelled(true);
-        else {
-            switch (profileStatus) {
-                case QUEUE:
-                case STAFF_MODE:
-                case CUSTOM_EDITOR:
-                case EDITOR:
-                    e.setCancelled(true);
-                    break;
+        if (isLobbyStatus(profileStatus)) {
+            if (!isLobbyProtectionAllowed("allow-item-pickup") && !player.hasPermission("zpp.admin")) {
+                e.setCancelled(true);
             }
+            return;
+        }
+
+        switch (profileStatus) {
+            case QUEUE:
+            case STAFF_MODE:
+            case CUSTOM_EDITOR:
+            case EDITOR:
+                e.setCancelled(true);
+                break;
         }
     }
 
@@ -228,8 +268,15 @@ public class InventoryListener implements Listener {
         Profile profile = ProfileManager.getInstance().getProfile(player);
         ProfileStatus profileStatus = profile.getStatus();
 
+        if (isLobbyStatus(profileStatus)) {
+            if (!isLobbyProtectionAllowed("allow-hunger")) {
+                e.setCancelled(true);
+                e.setFoodLevel(20);
+            }
+            return;
+        }
+
         switch (profileStatus) {
-            case LOBBY:
             case QUEUE:
             case STAFF_MODE:
             case CUSTOM_EDITOR:
@@ -248,8 +295,20 @@ public class InventoryListener implements Listener {
         if (profile == null) return;
         ProfileStatus profileStatus = profile.getStatus();
 
+        if (isLobbyStatus(profileStatus)) {
+            if (!isLobbyProtectionAllowed("allow-damage")) {
+                // Keep knockback from entity hits while preventing HP loss.
+                if (isLobbyProtectionAllowed("allow-velocity") && e instanceof EntityDamageByEntityEvent) {
+                    e.setDamage(0.0D);
+                    return;
+                }
+
+                e.setCancelled(true);
+            }
+            return;
+        }
+
         switch (profileStatus) {
-            case LOBBY:
             case QUEUE:
             case STAFF_MODE:
             case CUSTOM_EDITOR:
@@ -271,6 +330,14 @@ public class InventoryListener implements Listener {
         switch (profile.getStatus()) {
             case LOBBY, QUEUE, EDITOR, SPECTATE -> e.setCancelled(true);
         }
+    }
+
+    private boolean isLobbyStatus(ProfileStatus profileStatus) {
+        return profileStatus == ProfileStatus.LOBBY;
+    }
+
+    private boolean isLobbyProtectionAllowed(String setting) {
+        return ConfigManager.getConfig().getBoolean(LOBBY_PROTECTION_PATH + setting, false);
     }
 
 }

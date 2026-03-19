@@ -27,6 +27,8 @@ import dev.nandi0813.practice.util.interfaces.Spectatable;
 import dev.nandi0813.practice.util.playerutil.PlayerUtil;
 import lombok.Getter;
 import org.bukkit.Bukkit;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -78,7 +80,7 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
         this.open = true;
 
         if (this.build) {
-            this.buildRollback = new BuildRollback(new FightChangeOptimized(this));
+            this.buildRollback = new BuildRollback(new FightChangeOptimized(this), this::teleportStuckSpectatorsAfterRollback);
             this.buildRollback.begin();
         }
 
@@ -201,8 +203,14 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
         if (killer != null) {
             fightPlayers.get(killer).getProfile().getStats().getLadderStat(players.get(killer)).increaseKills();
 
+            playDeathEffect(killer, player);
+
             if (arena.isReKitAfterKill()) {
                 KitUtil.loadDefaultLadderKit(killer, TeamEnum.FFA, players.get(killer));
+            }
+
+            if (arena.isHealthResetOnKill()) {
+                applyHealthResetOnKill(killer);
             }
         }
 
@@ -215,6 +223,43 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
             Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () ->
                     teleportPlayer(player), 1L);
         }
+    }
+
+    private void playDeathEffect(Player killer, Player victim) {
+        if (killer == null || victim == null) {
+            return;
+        }
+
+        try {
+            Profile killerProfile = fightPlayers.containsKey(killer)
+                    ? fightPlayers.get(killer).getProfile()
+                    : ProfileManager.getInstance().getProfile(killer);
+
+            if (killerProfile == null || killerProfile.getCosmeticsData() == null) {
+                return;
+            }
+
+            var deathEffect = killerProfile.getCosmeticsData().getDeathEffect();
+            if (deathEffect == null) {
+                return;
+            }
+
+            List<Player> viewers = new ArrayList<>(players.keySet());
+            viewers.addAll(spectators);
+            deathEffect.play(victim.getLocation(), viewers);
+        } catch (Exception ignored) {
+            // Cosmetic effects should never break FFA kill handling.
+        }
+    }
+
+    private void applyHealthResetOnKill(Player killer) {
+        AttributeInstance maxHealth = killer.getAttribute(Attribute.MAX_HEALTH);
+        double maxHealthValue = maxHealth != null ? maxHealth.getValue() : 20.0D;
+        killer.setHealth(Math.max(1.0D, maxHealthValue));
+        killer.setFoodLevel(20);
+        killer.setSaturation(20.0F);
+        killer.setFireTicks(0);
+        killer.setFallDistance(0.0F);
     }
 
     /**
@@ -254,6 +299,32 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
         if (spectator) {
             for (Player spectatorPlayer : spectators) {
                 Common.sendMMMessage(spectatorPlayer, message);
+            }
+        }
+    }
+
+    private void teleportStuckSpectatorsAfterRollback() {
+        if (!this.open || !this.build || this.spectators.isEmpty()) {
+            return;
+        }
+
+        List<Player> activePlayers = new ArrayList<>(this.players.keySet());
+
+        for (Player spectator : new ArrayList<>(this.spectators)) {
+            if (spectator == null || !spectator.isOnline()) {
+                continue;
+            }
+
+            if (!dev.nandi0813.practice.manager.fight.util.PlayerUtil.isPlayerStuck(spectator)) {
+                continue;
+            }
+
+            if (!activePlayers.isEmpty()) {
+                spectator.teleport(activePlayers.get(random.nextInt(activePlayers.size())));
+            } else if (!this.arena.getFfaPositions().isEmpty()) {
+                spectator.teleport(this.arena.getFfaPositions().get(random.nextInt(this.arena.getFfaPositions().size())));
+            } else {
+                spectator.teleport(this.arena.getCuboid().getCenter().add(0, 1, 0));
             }
         }
     }

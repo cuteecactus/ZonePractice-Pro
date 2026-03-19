@@ -116,9 +116,10 @@ public class LadderTypeListener implements Listener {
 
     // ========== EVENT HANDLERS ==========
 
-    protected static void arrowDisplayHearth(Player shooter, Player target, double finalDamage) {
+    protected static void arrowDisplayHearth(Player shooter, Player target, double finalDamage, EntityDamageByEntityEvent event) {
         if (!PermanentConfig.DISPLAY_ARROW_HIT) return;
         if (shooter == null || target == null) return;
+        if (event.isCancelled()) return;
 
         Match match = MatchManager.getInstance().getLiveMatchByPlayer(shooter);
         if (match == null) return;
@@ -452,8 +453,9 @@ public class LadderTypeListener implements Listener {
     }
 
     @EventHandler
-    public void onItemPickup(PlayerPickupItemEvent e) {
-        Player player = e.getPlayer();
+    public void onItemPickup(EntityPickupItemEvent e) {
+        if (!(e.getEntity() instanceof Player player)) return;
+
         Match match = MatchManager.getInstance().getLiveMatchByPlayer(player);
         if (match == null) return;
 
@@ -569,7 +571,9 @@ public class LadderTypeListener implements Listener {
 
         if (killer != null) {
             Statistic statistic = match.getCurrentStat(killer);
-            statistic.setKills(statistic.getKills() + 1);
+            if (statistic != null) {
+                statistic.setKills(statistic.getKills() + 1);
+            }
         }
     }
 
@@ -584,7 +588,7 @@ public class LadderTypeListener implements Listener {
                 attacker = (Player) projectile.getShooter();
 
                 if (projectile instanceof Arrow) {
-                    arrowDisplayHearth(attacker, target, e.getFinalDamage());
+                    arrowDisplayHearth(attacker, target, e.getFinalDamage(), e);
                 }
             }
         }
@@ -594,18 +598,30 @@ public class LadderTypeListener implements Listener {
         Profile attackerProfile = ProfileManager.getInstance().getProfile(attacker);
         Profile targetProfile = ProfileManager.getInstance().getProfile(target);
 
+        if (attackerProfile == null || targetProfile == null) return;
+
         if (!attackerProfile.getStatus().equals(ProfileStatus.MATCH)) return;
         if (!targetProfile.getStatus().equals(ProfileStatus.MATCH)) return;
 
-        Match match = MatchManager.getInstance().getLiveMatchByPlayer(attacker);
-        if (match != MatchManager.getInstance().getLiveMatchByPlayer(target)) {
+        Match attackerMatch = MatchManager.getInstance().getLiveMatchByPlayer(attacker);
+        Match targetMatch = MatchManager.getInstance().getLiveMatchByPlayer(target);
+        if (attackerMatch == null || attackerMatch != targetMatch) {
             e.setCancelled(true);
             return;
         }
 
+        Match match = attackerMatch;
+
         if (!match.getCurrentRound().getRoundStatus().equals(RoundStatus.LIVE)) return;
 
-        boolean cancel = match.getCurrentStat(attacker).isSet() || match.getCurrentStat(target).isSet();
+        Statistic attackerStat = match.getCurrentStat(attacker);
+        Statistic targetStat = match.getCurrentStat(target);
+        if (attackerStat == null || targetStat == null) {
+            e.setCancelled(true);
+            return;
+        }
+
+        boolean cancel = attackerStat.isSet() || targetStat.isSet();
 
         if (!cancel) {
             cancel = TeamUtil.isSaveTeamMate(match, attacker, target);

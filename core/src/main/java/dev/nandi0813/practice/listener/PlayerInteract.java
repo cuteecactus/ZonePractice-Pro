@@ -2,7 +2,6 @@ package dev.nandi0813.practice.listener;
 
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
-import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
 import io.papermc.paper.event.player.PlayerFlowerPotManipulateEvent;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
@@ -13,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerBedEnterEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Objects;
@@ -47,39 +47,52 @@ public class PlayerInteract implements Listener {
         Player player = e.getPlayer();
         Profile profile = ProfileManager.getInstance().getProfile(player);
 
+        if (profile == null) {
+            return;
+        }
+
         Action action = e.getAction();
+        if (!action.equals(Action.RIGHT_CLICK_BLOCK) && !action.equals(Action.RIGHT_CLICK_AIR)) {
+            return;
+        }
+
         ItemStack item = e.getItem();
+        if (item == null || !item.getType().equals(Material.MUSHROOM_STEW)) {
+            return;
+        }
 
         switch (profile.getStatus()) {
             case MATCH:
             case FFA:
             case EVENT:
-                if (profile.getStatus().equals(ProfileStatus.MATCH) || profile.getStatus().equals(ProfileStatus.EVENT)) {
-                    // Soup listener
-                    if (action.equals(Action.RIGHT_CLICK_BLOCK) || action.equals(Action.RIGHT_CLICK_AIR)) {
-                        if (item != null && item.getType().equals(Material.MUSHROOM_STEW)) {
-                            int food = player.getFoodLevel();
-                            double health = player.getHealth();
-                            double maxHealth = Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getValue();
-                            double regen = 6.5;
+                int food = player.getFoodLevel();
+                double health = player.getHealth();
+                double maxHealth = Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getValue();
+                double regen = 6.5;
 
-                            if (food < 20) e.setCancelled(true);
+                if (food < 20) e.setCancelled(true);
 
-                            if (health == maxHealth) return;
+                if (health == maxHealth) return;
 
-                            if ((health + regen) < maxHealth) {
-                                player.getInventory().setItemInMainHand(new ItemStack(Material.BOWL));
-                                player.setHealth(health + regen);
-                            } else if ((health + regen) >= maxHealth) {
-                                player.getInventory().setItemInMainHand(new ItemStack(Material.BOWL));
-                                player.setHealth(maxHealth);
-                            }
-                            player.updateInventory();
-                        }
-                    }
+                if ((health + regen) < maxHealth) {
+                    consumeUsedSoup(player, e.getHand());
+                    player.setHealth(health + regen);
+                } else if ((health + regen) >= maxHealth) {
+                    consumeUsedSoup(player, e.getHand());
+                    player.setHealth(maxHealth);
                 }
+                player.updateInventory();
                 break;
         }
+    }
+
+    private void consumeUsedSoup(Player player, EquipmentSlot hand) {
+        if (hand == EquipmentSlot.OFF_HAND) {
+            player.getInventory().setItemInOffHand(new ItemStack(Material.AIR));
+            return;
+        }
+
+        player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
     }
 
     @EventHandler
