@@ -103,6 +103,12 @@ public class TempKillPlayer extends BukkitRunnable {
         if (languagePath != null && respawnTime > 0)
             match.sendMessage(replaceTeamNames(LanguageManager.getString(languagePath + ".PLAYER-RESPAWNED"), player, playerTeam), true);
 
+        // Clear spectator remnants immediately so damage/projectile listeners no longer treat the player as protected.
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        dev.nandi0813.practice.manager.fight.util.PlayerUtil.setCollidesWithEntities(player, true);
+
         match.teleportPlayer(player);
         PlayerUtil.setFightPlayer(player);
         match.getMatchPlayers().get(player).setKitChooserOrKit(playerTeam);

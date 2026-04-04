@@ -1,4 +1,4 @@
-VERSION: 29
+VERSION: 33
 
 GENERAL-FILLER-ITEM:
   NAME: " "
@@ -1614,6 +1614,25 @@ GUIS:
                 - ""
                 - "&e&lClick here &7to &aenable &7the"
                 - "&2health reset on kill &7in the arena."
+          HEALTH-BELOW-NAME:
+            ENABLED:
+              NAME: "&7Health Below Name: &aEnabled"
+              MATERIAL: PLAYER_HEAD
+              LORE:
+                - ""
+                - "&eShows players' health under"
+                - "&etheir name tags in this FFA."
+                - ""
+                - "&e&lClick here &7to &cdisable &7this setting."
+            DISABLED:
+              NAME: "&7Health Below Name: &cDisabled"
+              MATERIAL: RED_STAINED_GLASS_PANE
+              LORE:
+                - ""
+                - "&eShows players' health under"
+                - "&etheir name tags in this FFA."
+                - ""
+                - "&e&lClick here &7to &aenable &7this setting."
           LOBBY-AFTER-DEATH:
             ENABLED:
               NAME: "&7Lobby After Death: &aEnabled"
@@ -2128,18 +2147,19 @@ GUIS:
               - "&c&lNote: &7Default won't change the knockback."
               - "&7You can change the normal and combo knockbacks"
               - "&7in the config file."
-          HITDELAY:
-            NAME: "&7Hitdelay: &6%hitdelay% tick"
+          ATTACKCOOLDOWN:
+            NAME: "&7Attack Cooldown: &6%attackcooldown%x"
             MATERIAL: DIAMOND_SWORD
             LORE:
               - ""
-              - "&7Players can hit each other"
-              - "&7at these intervals."
+              - "&7Adjust the speed at which the"
+              - "&7attack strength bar recharges."
               - ""
-              - "&c&lNote: &71 sec = 20 tick"
+              - "&eCurrent Multiplier: &f%attackcooldown%x"
+              - "&7(Lower = Faster swinging)"
               - ""
-              - "&a&lLEFT-CLICK &ato reduce the rounds."
-              - "&b&lRIGHT-CLICK &bto increase the rounds."
+              - "&a&lLEFT-CLICK &7to decrease by &c0.1"
+              - "&b&lRIGHT-CLICK &7to increase by &b0.1"
           MAX-DURATION:
             NAME: "&7Max Duration: &6%maxDuration% sec"
             MATERIAL: CLOCK
@@ -2330,6 +2350,16 @@ GUIS:
               - ""
               - "&a&lLEFT-CLICK &ato reduce the cooldown."
               - "&b&lRIGHT-CLICK &bto increase the cooldown."
+          WIND-CHARGE-COOLDOWN:
+            NAME: "&7Wind Charge Cooldown: &6%windChargeCooldown% sec"
+            MATERIAL: WIND_CHARGE
+            LORE:
+              - ""
+              - "&7Players must wait this long before"
+              - "&7they can launch the next wind charge."
+              - ""
+              - "&a&lLEFT-CLICK &ato reduce the cooldown."
+              - "&b&lRIGHT-CLICK &bto increase the cooldown."
           DROP-INVENTORY-PARTY-GAMES:
             ENABLED:
               NAME: "&7Drop Inventory: &aEnabled"
@@ -2395,6 +2425,18 @@ GUIS:
               - ""
               - "&7This controls the %blockReturnDelayTarget%"
               - "&7return delay after placement."
+              - "&7Set to &e-1 &7to disable auto return."
+              - ""
+              - "&a&lLEFT-CLICK &ato reduce the delay."
+              - "&b&lRIGHT-CLICK &bto increase the delay."
+          TEMP-BUILD-RETURN-DELAY:
+            NAME: "&7Temporary Block Return Delay: &6%tempBuildReturnDelay%"
+            MATERIAL: RED_TERRACOTTA
+            LORE:
+              - ""
+              - "&7This controls how long placed"
+              - "&7temporary blocks stay before"
+              - "&7they automatically disappear."
               - "&7Set to &e-1 &7to disable auto return."
               - ""
               - "&a&lLEFT-CLICK &ato reduce the delay."
@@ -3433,3 +3475,58 @@ GUIS:
       PATTERN-PICKER:
         TITLE: "&8Pick Pattern"
         APPLIED-MESSAGE: "<green>Layer applied!"
+  MATCH-HISTORY:
+    # GUI title. %player% = the target player's name.
+    TITLE: "&8Match History &7- &6%player%"
+
+    # Total number of slots. Must be a multiple of 9, max 54.
+    SIZE: 27
+
+    # When true, match items are automatically centred inside the GUI.
+    # Set false to start them at slot 0 (or use START-SLOT).
+    CENTER-ITEMS: true
+
+    # Override the first item slot. Set to -1 to use CENTER-ITEMS logic.
+    START-SLOT: -1
+
+    # Filler item placed in every unused slot.
+    FILLER-ITEM:
+      MATERIAL: BLACK_STAINED_GLASS_PANE
+      NAME: " "
+
+    MATCH-ITEM:
+      # Set to true to show the opponent's player head as the item.
+      # Set to false to use MATERIAL instead.
+      USE-PLAYER-HEAD: true
+
+      # Fallback material used when USE-PLAYER-HEAD is false.
+      MATERIAL: PAPER
+
+      # Enchantment glow on the item when the viewer won this match.
+      GLOW-ON-WIN: true
+
+      # Item display name. Supports & colour codes.
+      # Placeholders: %opponent% %result% %score% %kit% %arena%
+      #               %player_health% %opponent_health% %duration% %date%
+      NAME: "&eMatch vs &f%opponent%"
+
+      # Item lore. Supports & colour codes and the same placeholders.
+      LORE:
+        - "&8&m--------------------"
+        - "&7Result: %result%"
+        - "&7Score: &f%score%"
+        - "&7Kit: &f%kit%"
+        - "&7Arena: &f%arena%"
+        - ""
+        - "&7Your Health: %player_health%"
+        - "&7Opp Health: %opponent_health%"
+        - ""
+        - "&7Duration: &f%duration%"
+        - "&7Played: &f%date%"
+        - "&8&m--------------------"
+
+    # Result label strings inserted into %result%.
+    MESSAGES:
+      WIN: "&aWin"
+      LOSS: "&cLoss"
+      DRAW: "&eDraw"

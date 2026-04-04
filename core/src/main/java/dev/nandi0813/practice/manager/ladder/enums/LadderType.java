@@ -64,7 +64,7 @@ public enum LadderType {
             .withTeamSettings()
             .withCommonSettings()
             .withPearlSettings()
-            .withSetting(SettingType.BLOCK_RETURN_DELAY)
+            .withSetting(SettingType.TEMP_BUILD_RETURN_DELAY)
     ),
 
     BOXING(LadderTypeConfig.builder(
@@ -91,7 +91,8 @@ public enum LadderType {
             .withCommonSettings()
             .withSettings(
                     SettingType.GOLDEN_APPLE_COOLDOWN,
-                    SettingType.BLOCK_RETURN_DELAY
+                    SettingType.TEMP_BUILD_RETURN_DELAY,
+                    SettingType.MULTI_ROUND_START_COUNTDOWN
             )
             .withBuildSettings()
     ),
@@ -114,7 +115,10 @@ public enum LadderType {
                     SettingType.ROUNDS,
                     SettingType.MAX_DURATION,
                     SettingType.START_COUNTDOWN,
-                    SettingType.SPLEEF_SNOWBALL_MODE
+                    SettingType.SPLEEF_SNOWBALL_MODE,
+                    SettingType.ROUND_END_DELAY,
+                    SettingType.COUNTDOWN_TITLES,
+                    SettingType.ROUND_STATUS_TITLES
             )
     ),
 
@@ -212,7 +216,7 @@ public enum LadderType {
             .withCommonSettings()
             .withPearlSettings()
             .withBuildSettings()
-            .withSetting(SettingType.BLOCK_RETURN_DELAY)
+            .withSetting(SettingType.TEMP_BUILD_RETURN_DELAY)
     );
 
     private final String name;

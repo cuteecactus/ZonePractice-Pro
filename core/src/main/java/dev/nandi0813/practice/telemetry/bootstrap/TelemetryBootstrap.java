@@ -1,6 +1,5 @@
 package dev.nandi0813.practice.telemetry.bootstrap;
 
-import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.telemetry.config.TelemetryConfig;
 import org.json.JSONObject;
 
@@ -28,6 +27,8 @@ public enum TelemetryBootstrap {
 
     private static volatile boolean active;
     private static volatile boolean aiCollectionActive;
+    private static volatile boolean practiceStatsActive;
+    private static volatile boolean debugEnabled;
     private static volatile CompletableFuture<Boolean> initializationFuture;
 
     public static CompletableFuture<Boolean> initializeAsync() {
@@ -44,13 +45,16 @@ public enum TelemetryBootstrap {
                 return initializationFuture != null ? initializationFuture : CompletableFuture.completedFuture(active);
             }
 
+            TelemetryDebugLog.setDebugEnabled(false);
+            debugEnabled = false;
+
             boolean regularEnabled = TelemetryConfig.isRegularEnabled();
             boolean aiEnabled = TelemetryConfig.isAiEnabled();
             if (!regularEnabled && !aiEnabled) {
                 active = false;
                 aiCollectionActive = false;
+                practiceStatsActive = false;
                 resolved.set(true);
-                ZonePractice.getInstance().getLogger().info("Telemetry disabled in config (TELEMETRY.ENABLED and TELEMETRY.AI.ENABLED).");
                 initializationFuture = CompletableFuture.completedFuture(false);
                 return initializationFuture;
             }
@@ -59,8 +63,8 @@ public enum TelemetryBootstrap {
             if (statsEndpoint == null) {
                 active = false;
                 aiCollectionActive = false;
+                practiceStatsActive = false;
                 resolved.set(true);
-                ZonePractice.getInstance().getLogger().info("Telemetry disabled: endpoint is not configured.");
                 initializationFuture = CompletableFuture.completedFuture(false);
                 return initializationFuture;
             }
@@ -70,36 +74,40 @@ public enum TelemetryBootstrap {
                     .thenApply(result -> {
                         boolean receivingEnabled = false;
                         boolean aiRemoteEnabled = false;
+                        boolean practiceStatsRemoteEnabled = false;
 
                         if (!result.success()) {
-                            ZonePractice.getInstance().getLogger().warning(
-                                    "Telemetry stats fetch failed (endpoint=" + statsEndpoint + ", status=" + result.statusCode + ", error=" + result.error + ")"
-                            );
                         } else {
                             try {
                                 JSONObject jsonObject = new JSONObject(result.body);
                                 receivingEnabled = extractBoolean(jsonObject, "is_receiving_enabled", false);
                                 aiRemoteEnabled = extractBoolean(jsonObject, "is_ai_collection_enabled", false);
+                                practiceStatsRemoteEnabled = extractBoolean(jsonObject, "is_practice_stats_enabled", false);
+                                debugEnabled = extractBoolean(jsonObject, "is_debug_enabled", false);
+                                TelemetryDebugLog.setDebugEnabled(debugEnabled);
                             } catch (Exception exception) {
-                                ZonePractice.getInstance().getLogger().warning(
-                                        "Telemetry stats response parse failed (endpoint=" + statsEndpoint + ", body=" + result.body + ")"
-                                );
+                                debugEnabled = false;
+                                TelemetryDebugLog.setDebugEnabled(false);
                             }
                         }
 
                         active = regularEnabled && receivingEnabled;
                         aiCollectionActive = aiEnabled && aiRemoteEnabled;
+                        practiceStatsActive = regularEnabled && practiceStatsRemoteEnabled;
                         resolved.set(true);
 
-                        ZonePractice.getInstance().getLogger().info(
+                        TelemetryDebugLog.info(
                                 "Telemetry flags -> regular=" + active + ", ai=" + aiCollectionActive
                                         + " (localRegular=" + regularEnabled
                                         + ", localAi=" + aiEnabled
                                         + ", remoteRegular=" + receivingEnabled
-                                        + ", remoteAi=" + aiRemoteEnabled + ")"
+                                        + ", remoteAi=" + aiRemoteEnabled
+                                        + ", practiceStats=" + practiceStatsActive
+                                        + ", remotePracticeStats=" + practiceStatsRemoteEnabled
+                                        + ", debug=" + debugEnabled + ")"
                         );
 
-                        return active || aiCollectionActive;
+                        return active || aiCollectionActive || practiceStatsActive;
                     });
             return initializationFuture;
         }
@@ -119,6 +127,14 @@ public enum TelemetryBootstrap {
 
     public static boolean isAiCollectionActive() {
         return resolved.get() && aiCollectionActive;
+    }
+
+    public static boolean isPracticeStatsActive() {
+        return resolved.get() && practiceStatsActive;
+    }
+
+    public static boolean isDebugEnabled() {
+        return resolved.get() && debugEnabled;
     }
 
     public static CompletableFuture<Boolean> fetchAiCollectionEnabledAsync() {

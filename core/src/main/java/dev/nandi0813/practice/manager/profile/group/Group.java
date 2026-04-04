@@ -3,7 +3,6 @@ package dev.nandi0813.practice.manager.profile.group;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
@@ -28,8 +27,11 @@ public class Group {
     private final int modifiableKitLimit;
 
     // Nametag stuff
+    private final String prefixTemplate;
     private final Component prefix;
-    private final NamedTextColor nameColor;
+    private final String nameTemplate;
+    private final Component nameFormat;
+    private final String suffixTemplate;
     private final Component suffix;
     private final int sortPriority;
 
@@ -38,7 +40,7 @@ public class Group {
     // Set up in the sidebar.yml file
     private final List<Component> sidebarExtension;
 
-    public Group(String name, String displayName, int weight, int unrankedLimit, int rankedLimit, int eventStartLimit, int partyBroadcastLimit, int partyMemberLimit, int customKitLimit, int modifiableKitLimit, Component prefix, NamedTextColor nameColor, Component suffix, int sortPriority, String chatFormat, List<Component> sidebarExtension) {
+    public Group(String name, String displayName, int weight, int unrankedLimit, int rankedLimit, int eventStartLimit, int partyBroadcastLimit, int partyMemberLimit, int customKitLimit, int modifiableKitLimit, String prefixTemplate, Component prefix, String nameTemplate, Component nameFormat, String suffixTemplate, Component suffix, int sortPriority, String chatFormat, List<Component> sidebarExtension) {
         this.name = name;
         this.displayName = displayName;
 
@@ -64,8 +66,11 @@ public class Group {
             this.modifiableKitLimit = modifiableKitLimit;
         }
 
+        this.prefixTemplate = prefixTemplate;
         this.prefix = prefix;
-        this.nameColor = nameColor;
+        this.nameTemplate = nameTemplate;
+        this.nameFormat = nameFormat;
+        this.suffixTemplate = suffixTemplate;
         this.suffix = suffix;
         this.sortPriority = sortPriority;
 

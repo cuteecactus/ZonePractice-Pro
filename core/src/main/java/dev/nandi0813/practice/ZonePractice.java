@@ -22,6 +22,7 @@ import dev.nandi0813.practice.manager.arena.util.ArenaWorldUtil;
 import dev.nandi0813.practice.manager.backend.*;
 import dev.nandi0813.practice.manager.division.DivisionManager;
 import dev.nandi0813.practice.manager.fight.event.EventManager;
+import dev.nandi0813.practice.manager.matchhistory.MatchHistoryManager;
 import dev.nandi0813.practice.manager.fight.ffa.FFAListener;
 import dev.nandi0813.practice.manager.fight.ffa.FFAManager;
 import dev.nandi0813.practice.manager.fight.listener.BuildListener;
@@ -46,6 +47,7 @@ import dev.nandi0813.practice.telemetry.bootstrap.TelemetryBootstrap;
 import dev.nandi0813.practice.telemetry.collector.TelemetryMatchListener;
 import dev.nandi0813.practice.telemetry.transport.ai.AiTrainingLogger;
 import dev.nandi0813.practice.telemetry.transport.regular.TelemetryLogger;
+import dev.nandi0813.practice.telemetry.transport.stats.PracticeStatsTelemetryLogger;
 import dev.nandi0813.practice.util.*;
 import dev.nandi0813.practice.util.placeholderapi.PlayerExpansion;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
@@ -120,7 +122,9 @@ public final class ZonePractice extends JavaPlugin {
 
         ConfigManager.createFile();
         TelemetryBootstrap.initializeAsync()
-                .thenApply(regularEnabled -> regularEnabled || TelemetryBootstrap.isAiCollectionActive())
+                .thenApply(regularEnabled -> regularEnabled
+                        || TelemetryBootstrap.isAiCollectionActive()
+                        || TelemetryBootstrap.isPracticeStatsActive())
                 .thenAccept(enabled -> {
                     if (!enabled) {
                         return;
@@ -131,7 +135,12 @@ public final class ZonePractice extends JavaPlugin {
                             return;
                         }
 
-                        if (telemetryListenerRegistered.compareAndSet(false, true)) {
+                        if (TelemetryBootstrap.isPracticeStatsActive()) {
+                            PracticeStatsTelemetryLogger.initialize();
+                        }
+
+                        if ((TelemetryBootstrap.isActive() || TelemetryBootstrap.isAiCollectionActive())
+                                && telemetryListenerRegistered.compareAndSet(false, true)) {
                             Bukkit.getPluginManager().registerEvents(new TelemetryMatchListener(), this);
                         }
                     });
@@ -139,6 +148,7 @@ public final class ZonePractice extends JavaPlugin {
         LanguageManager.createFile(this);
         GUIFile.createFile(this);
         MysqlManager.openConnection();
+        MatchHistoryManager.getInstance(); // eagerly initialise singleton
         DivisionManager.getInstance().getData();
         ArenaWorldUtil.createArenaWorld();
         BackendManager.createFile(this);
@@ -242,6 +252,7 @@ public final class ZonePractice extends JavaPlugin {
         // Flush async telemetry writes at shutdown so completed matches are persisted.
         TelemetryLogger.shutdown();
         AiTrainingLogger.shutdown();
+        PracticeStatsTelemetryLogger.shutdown();
     }
 
     /**
@@ -287,6 +298,12 @@ public final class ZonePractice extends JavaPlugin {
         MatchStatsCommand matchStatsCommand = new MatchStatsCommand();
         if (server.getPluginCommand("matchinv") != null) {
             server.getPluginCommand("matchinv").setExecutor(matchStatsCommand);
+        }
+
+        MatchHistoryCommand matchHistoryCommand = new MatchHistoryCommand();
+        if (server.getPluginCommand("matchhistory") != null) {
+            server.getPluginCommand("matchhistory").setExecutor(matchHistoryCommand);
+            server.getPluginCommand("matchhistory").setTabCompleter(matchHistoryCommand);
         }
 
         PartyCommand partyCommand = new PartyCommand();
@@ -375,6 +392,18 @@ public final class ZonePractice extends JavaPlugin {
         CosmeticsCommand cosmeticsCommand = new CosmeticsCommand();
         if (server.getPluginCommand("cosmetics") != null) {
             server.getPluginCommand("cosmetics").setExecutor(cosmeticsCommand);
+        }
+
+        CustomQueueCommand customQueueCommand = new CustomQueueCommand();
+        if (server.getPluginCommand("customqueue") != null) {
+            server.getPluginCommand("customqueue").setExecutor(customQueueCommand);
+            server.getPluginCommand("customqueue").setTabCompleter(customQueueCommand);
+        }
+
+        NickCommand nickCommand = new NickCommand();
+        if (server.getPluginCommand("nick") != null) {
+            server.getPluginCommand("nick").setExecutor(nickCommand);
+            server.getPluginCommand("nick").setTabCompleter(nickCommand);
         }
 
         if (ConfigManager.getBoolean("CHAT.PRIVATE-CHAT-ENABLED")) {

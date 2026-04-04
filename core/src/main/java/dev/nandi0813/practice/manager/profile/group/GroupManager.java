@@ -7,6 +7,7 @@ import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.sidebar.SidebarManager;
 import dev.nandi0813.practice.util.Common;
+import dev.nandi0813.practice.util.NameFormatUtil;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -15,6 +16,7 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Getter
 public class GroupManager extends ConfigFile {
@@ -37,7 +39,7 @@ public class GroupManager extends ConfigFile {
     }
 
     public void loadGroups() {
-        for (String groupName : this.config.getConfigurationSection("GROUPS").getKeys(false)) {
+        for (String groupName : Objects.requireNonNull(this.config.getConfigurationSection("GROUPS")).getKeys(false)) {
             String chatFormat = null;
             if (this.config.isSet("GROUPS." + groupName + ".CHAT-FORMAT"))
                 chatFormat = this.getString("GROUPS." + groupName + ".CHAT-FORMAT");
@@ -48,6 +50,16 @@ public class GroupManager extends ConfigFile {
                     sidebarExtension.add(ZonePractice.getMiniMessage().deserialize(line));
                 }
             }
+
+            String prefixTemplate = this.getString("GROUPS." + groupName + ".LOBBY-NAMETAG.PREFIX");
+            String nameTemplate = this.config.isSet("GROUPS." + groupName + ".LOBBY-NAMETAG.NAME")
+                    ? this.getString("GROUPS." + groupName + ".LOBBY-NAMETAG.NAME")
+                    : "<gray>%player%";
+            String suffixTemplate = this.getString("GROUPS." + groupName + ".LOBBY-NAMETAG.SUFFIX");
+
+            Component nameFormat = this.config.isSet("GROUPS." + groupName + ".LOBBY-NAMETAG.NAME")
+                    ? NameFormatUtil.parseConfiguredComponent(nameTemplate)
+                    : Component.text("%player%", NamedTextColor.GRAY);
 
             Group group = new Group(
                     groupName,
@@ -62,9 +74,12 @@ public class GroupManager extends ConfigFile {
                             : DEFAULT_PARTY_MEMBER_LIMIT,
                     this.getInt("GROUPS." + groupName + ".CUSTOM-KIT"),
                     this.getInt("GROUPS." + groupName + ".MODIFIABLE-KIT-PER-LADDER"),
-                    ZonePractice.getMiniMessage().deserialize(this.getString("GROUPS." + groupName + ".LOBBY-NAMETAG.PREFIX")),
-                    NamedTextColor.NAMES.valueOr(this.getString("GROUPS." + groupName + ".LOBBY-NAMETAG.NAME-COLOR").toLowerCase(), NamedTextColor.GRAY),
-                    ZonePractice.getMiniMessage().deserialize(this.getString("GROUPS." + groupName + ".LOBBY-NAMETAG.SUFFIX")),
+                    prefixTemplate,
+                    NameFormatUtil.parseConfiguredComponent(prefixTemplate),
+                    nameTemplate,
+                    nameFormat,
+                    suffixTemplate,
+                    NameFormatUtil.parseConfiguredComponent(suffixTemplate),
                     this.getInt("GROUPS." + groupName + ".LOBBY-NAMETAG.SORT-PRIORITY"),
                     chatFormat,
                     sidebarExtension);
@@ -88,7 +103,7 @@ public class GroupManager extends ConfigFile {
         Profile profile = ProfileManager.getInstance().getProfile(player);
         if (profile.getPlayer().isOp()) {
             try {
-                profile.setGroup(groups.get(groups.size() - 1));
+                profile.setGroup(groups.getLast());
             } catch (Exception e) {
                 Common.sendConsoleMMMessage("<red>Failed to set group for " + profile.getPlayer().getName() + "! Error: " + e.getMessage());
             }
@@ -113,7 +128,7 @@ public class GroupManager extends ConfigFile {
 
         // If player has no permissions for any group, assign them to the lowest weighted group (default)
         if (currentGroup == null && !groups.isEmpty()) {
-            currentGroup = groups.get(0); // First group in sorted list = lowest weight
+            currentGroup = groups.getFirst(); // First group in sorted list = lowest weight
         }
 
         return currentGroup;

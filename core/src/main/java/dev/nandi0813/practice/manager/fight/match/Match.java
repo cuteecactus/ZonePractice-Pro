@@ -31,6 +31,7 @@ import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
 import dev.nandi0813.practice.manager.spectator.SpectatorManager;
+import dev.nandi0813.practice.telemetry.transport.stats.PracticeStatsTelemetryLogger;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.Cuboid;
 import dev.nandi0813.practice.util.StringUtil;
@@ -99,7 +100,14 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
 
     protected Match(final Ladder ladder, final Arena arena, final List<Player> players, final int winsNeeded) {
         this.id = MatchUtil.getMatchID();
-        this.arena = arena.getAvailableArena();
+        NormalArena resolvedArena = arena != null ? arena.getAvailableArena() : null;
+        if (resolvedArena == null) {
+            String ladderName = ladder != null ? ladder.getName() : "unknown";
+            String arenaName = arena != null ? arena.getName() : "null";
+            throw new IllegalStateException("Cannot create match without available arena (ladder=" + ladderName + ", arena=" + arenaName + ")");
+        }
+
+        this.arena = resolvedArena;
         this.ladder = ladder;
         this.winsNeeded = winsNeeded;
         this.players = new ArrayList<>(players);
@@ -109,7 +117,7 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
         }
         this.fightChange = new FightChangeOptimized(this);
 
-        if (arena.getSideBuildLimit() > 0)
+        if (arena != null && arena.getSideBuildLimit() > 0)
             this.sideBuildLimit = MatchUtil.getSideBuildLimitCube(this.arena.getCuboid().clone(), arena.getSideBuildLimit());
         else
             this.sideBuildLimit = null;
@@ -273,9 +281,13 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
 
         if (ladder instanceof NormalLadder) {
             if (killer != null) {
-                matchPlayers.get(killer).getProfile().getStats().getLadderStat((NormalLadder) ladder).increaseKills();
+                Profile killerProfile = matchPlayers.get(killer).getProfile();
+                killerProfile.getStats().getLadderStat((NormalLadder) ladder).increaseKills();
+                PracticeStatsTelemetryLogger.markDirty(killerProfile);
             }
-            matchPlayers.get(player).getProfile().getStats().getLadderStat((NormalLadder) ladder).increaseDeaths();
+            Profile deadProfile = matchPlayers.get(player).getProfile();
+            deadProfile.getStats().getLadderStat((NormalLadder) ladder).increaseDeaths();
+            PracticeStatsTelemetryLogger.markDirty(deadProfile);
         }
 
         playDeathEffect(killer, player);
@@ -660,7 +672,7 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
 
     @Override
     public Cuboid getCuboid() {
-        return arena.getCuboid();
+        return arena != null ? arena.getCuboid() : null;
     }
 
 }

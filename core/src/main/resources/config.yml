@@ -1,4 +1,4 @@
-VERSION: 43
+VERSION: 51
 
 # Mysql database setup.
 MYSQL-DATABASE:
@@ -35,6 +35,13 @@ QUEUE:
     ENABLED: true # If true, lobby uses a single queue item instead of separate ranked and unranked items.
     DEFAULT-GUI: "UNRANKED" # Options: UNRANKED, RANKED
     SWITCH-ENABLED: true
+  MULTI:
+    ENABLED: true
+    PERMISSION: "zpp.queue.multi"
+    MAX-LADDERS: 3 # Set to -1 or 0 for unlimited.
+    SIDEBAR:
+      MULTIPLE-LABEL: "Multiple Ladders"
+      CURRENT-LADDER-FORMAT: "<white>Current: <gold>%ladder%"
   UNRANKED:
     CUSTOM-KIT:
       ENABLED: true # If false, the custom kit queue feature is disabled and only shows filler items
@@ -241,8 +248,11 @@ MATCH-SETTINGS:
     START-COUNTDOWN-FROM: 5
   HEALTH-BELOW-NAME:
     SATURATED-HEART-INDICATOR: true # If true, the below-name heart icon turns yellow when the player is saturated.
-    LOW-HEALTH-DECIMAL-RATIO: true # If true, health below 2 hearts is shown as a decimal ratio (current/max).
+    DECIMAL-HEART-INDICATOR:
+      ALWAYS-SHOW: true # If true, the below-name heart icon always shows the decimal hearts.
+      LOW-HEALTH-DECIMAL-RATIO: true # If true, health below 2 hearts is shown as a decimal ratio (current/max).
     LOW-HEALTH-THRESHOLD: 4.0
+    SCALE: 20 # The scale setting defines the health display range between 10 and 100 with a default value of 20.
   BUILD-LIMIT-DEFAULT: 4 # Counts from the first players positions Y level. You can set a unique number for this for every arena, then it will consider where you are standing.
   AFTER-COUNTDOWN: 3 # After the match is over this countdown start, and when it's over, the players teleport back to the lobby.
   GOLDEN-HEAD: # Golden head settings.
@@ -276,6 +286,8 @@ MATCH-SETTINGS:
   ENDERPEARL:
     COOLDOWN: 13 # This is the default cooldown. You can change it in the ladder settings.
     EXP-BAR: true # Countdown shows on exp bar.
+  WIND-CHARGE:
+    COOLDOWN: 0 # Default wind charge cooldown in seconds. You can change it in the ladder settings.
   FIREWORK-ROCKET:
     COOLDOWN: 1 # Cooldown in seconds for using firework rockets with elytra. Default is 1 second.
   FIREBALL-FIGHT: # These are multiplier values, so please test what is optimal for you and don't change them too much at once or the difference will multiply.
@@ -290,14 +302,33 @@ MATCH-SETTINGS:
         VERTICAL: 1.4
   TNT-SUMO:
     EXPLOSION:
-      EXPLOSION-HORIZONTAL-RADIUS: 4.0 # Maximum block distance on the X and Z axis for a player to take knockback
-      EXPLOSION-VERTICAL-RADIUS: 2.5 # Maximum block distance on the Y axis for a player to take knockback
-      HORIZONTAL-MULTIPLIER: 0.85 # Lowered significantly so players do not fly too far sideways
-      VERTICAL-MULTIPLIER: 1.35 # Increased massively to provide a high base upward launch
-      SWEET-SPOT-Y-BOOST: 1.50 # Increased to ensure perfectly placed TNT launches the player 8 to 10 blocks high
-      GROUNDED-HORIZONTAL-MULTIPLIER: 0.15 # Lowered so grounded players stay closer to the explosion source
-      GROUNDED-VERTICAL-MULTIPLIER: 0.60 # Increased to pop grounded players higher into the air immediately
-      GROUNDED-CHAIN-LIFT: 0.35 # Increased so rapid TNT placement gives a massive upward momentum boost
+      # --- Radius Settings ---
+      HORIZONTAL-RADIUS: 4.0
+      VERTICAL-RADIUS: 2.5
+
+      # --- Multipliers (Base) ---
+      HORIZONTAL-MULTIPLIER: 1.6
+      VERTICAL-MULTIPLIER: 0.75
+      SWEET-SPOT-Y-BOOST: 0.85
+
+      # --- Grounded Physics ---
+      # Controls how players behave when they are touching the block/ground
+      GROUNDED-HORIZONTAL-MULTIPLIER: 0.08
+      GROUNDED-VERTICAL-MULTIPLIER: 0.08
+      GROUNDED-CHAIN-LIFT: 0.12
+
+      # --- Distance & Falloff ---
+      # Defines how knockback scales as you move away from the TNT center
+      NEAR-FULL-FORCE-DISTANCE: 1.5
+      SHARP-FALLOFF-START-DISTANCE: 3.5
+      MID-FORCE-AT-FALLOFF-START: 0.35
+
+      # --- Airborne & Juggling Logic ---
+      # Logic for stacking hits while a player is already in the air
+      AIRBORNE-JUGGLE-MULTIPLIER: 1.08
+      AIRBORNE-STACK-WINDOW-MILLIS: 55
+      AIRBORNE-OVERFLOW-PER-EXTRA-HIT: 0.08
+      AIRBORNE-OVERFLOW-MAX: 0.24
   BOXING:
     CUSTOM-ATTACK-COOLDOWN:
       ENABLED: true
@@ -337,6 +368,7 @@ FFA:
   ROLLBACK:
     SECONDS: 300 # After the seconds, the arena will be reseted back to its original state (only on build arenas).
   HEALTH-RESET-ON-KILL: false # Default for newly created FFA arenas. If enabled, killers are fully healed on kill.
+  HEALTH-BELOW-NAME: false # Default for newly created FFA arenas. If enabled, players see heart indicators below names.
   DISPLAY-ARROW-HIT-HEALTH: true # If true, the player will see the health of the player they hit.
   ENDER-PEARL-EXP-BAR: true # If true, the ender pearl cooldown will be displayed on the exp bar.
   ALLOW-DESTROYABLE-BLOCK: true # If true, player can destroy the fixed blocks in the arena that their ladder has.
@@ -413,6 +445,16 @@ SOUNDS:
     SOUND: BLOCK_NOTE_BLOCK_PLING
     VOLUME: 1
     PITCH: 1
+  GUI_CLICK_ADVANCE:
+    ENABLED: true
+    SOUND: BLOCK_STONE_BUTTON_CLICK_ON
+    VOLUME: 0.15
+    PITCH: 0.8
+  GUI_CLICK_BACK:
+    ENABLED: true
+    SOUND: BLOCK_NOTE_BLOCK_BASS
+    VOLUME: 0.12
+    PITCH: 0.75
 #
 # Leaderboard settings
 LEADERBOARD:
@@ -537,6 +579,8 @@ ARENA:
 EVENT:
   MULTIPLE: false # If true, multiple events can happen in the same time. But only one can be in the collecting phase.
   AUTO-EVENTS: true
+  DUEL:
+    POST-KILL-DELAY: 3 # Seconds to wait after a duel-event elimination before forwarding/next round. (alias: event-post-kill-delay)
   ENDERPEARL-COOLDOWN: 10 # In sec.
   BROADCAST:
     ENABLE: true
@@ -637,4 +681,4 @@ CHAT:
   STAFF-CHAT:
     ENABLED: true
     SHORTCUT: true # If true, you can use send message like #hello world instead of enabling staff chat each time.
-  PRIVATE-CHAT-ENABLED: true # Private message system /message (/m) and /reply (/re, /r)
+  PRIVATE-CHAT-ENABLED: true # Private message system /message (/m) and /reply (/re, /r).

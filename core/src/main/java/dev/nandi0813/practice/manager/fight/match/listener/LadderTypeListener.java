@@ -197,7 +197,6 @@ public class LadderTypeListener implements Listener {
             if (!target.isOnline() || target.isDead()) {
                 return;
             }
-            target.setNoDamageTicks(0);
         });
     }
 
@@ -653,8 +652,15 @@ public class LadderTypeListener implements Listener {
             return;
         }
 
-        if (e instanceof EntityDamageByEntityEvent) {
-            onEntityDamageByEntity((EntityDamageByEntityEvent) e);
+        if (e instanceof EntityDamageByEntityEvent damageByEntityEvent) {
+            if (shouldDelegateExplosiveByEntityDamageToLadder(damageByEntityEvent, match)) {
+                if (match.getLadder() instanceof LadderHandle ladderHandle) {
+                    ladderHandle.handleEvents(e, match);
+                }
+                return;
+            }
+
+            onEntityDamageByEntity(damageByEntityEvent);
             return;
         }
 
@@ -725,14 +731,12 @@ public class LadderTypeListener implements Listener {
         if (!attackerProfile.getStatus().equals(ProfileStatus.MATCH)) return;
         if (!targetProfile.getStatus().equals(ProfileStatus.MATCH)) return;
 
-        Match attackerMatch = MatchManager.getInstance().getLiveMatchByPlayer(attacker);
+        Match match = MatchManager.getInstance().getLiveMatchByPlayer(attacker);
         Match targetMatch = MatchManager.getInstance().getLiveMatchByPlayer(target);
-        if (attackerMatch == null || attackerMatch != targetMatch) {
+        if (match == null || match != targetMatch) {
             e.setCancelled(true);
             return;
         }
-
-        Match match = attackerMatch;
 
         if (!match.getCurrentRound().getRoundStatus().equals(RoundStatus.LIVE)) return;
 
@@ -762,14 +766,19 @@ public class LadderTypeListener implements Listener {
         // regardless of whether the event was cancelled by a ladder handler.
         match.recordAttack(target, attacker);
 
-        boolean shieldBlocked = !e.isCancelled() && isShieldBlockedHit(e, target);
+        boolean shieldBlocked = isShieldBlockedHit(e, target);
         if (shieldBlocked) {
             enforceShieldDamageTickBypass(target);
             applyCustomShieldStunIfNeeded(e, attacker, target);
         }
 
         if (!e.isCancelled() && !match.getLadder().getLadderKnockback().getKnockbackType().equals(KnockbackType.DEFAULT)) {
-            KnockbackUtil.setPlayerKnockback(target, attacker, match.getLadder().getLadderKnockback().getKnockbackType());
+            if (shieldBlocked) {
+                // Shield blocks should recoil the attacker, not launch the blocker forward.
+                KnockbackUtil.setPlayerKnockback(attacker, target, match.getLadder().getLadderKnockback().getKnockbackType());
+            } else {
+                KnockbackUtil.setPlayerKnockback(target, attacker, match.getLadder().getLadderKnockback().getKnockbackType());
+            }
         }
     }
 
@@ -876,6 +885,16 @@ public class LadderTypeListener implements Listener {
                 }
             }
         }
+    }
+
+    private static boolean shouldDelegateExplosiveByEntityDamageToLadder(EntityDamageByEntityEvent event, Match match) {
+        Entity damager = event.getDamager();
+        if (!(damager instanceof TNTPrimed) && !(damager instanceof Fireball)) {
+            return false;
+        }
+
+        LadderType ladderType = match.getLadder().getType();
+        return ladderType == LadderType.FIREBALL_FIGHT || ladderType == LadderType.TNT_SUMO;
     }
 
 }

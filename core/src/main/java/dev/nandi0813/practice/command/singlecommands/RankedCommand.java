@@ -25,18 +25,22 @@ public class RankedCommand implements CommandExecutor {
 
         Profile profile = ProfileManager.getInstance().getProfile(player);
 
-        if (!profile.getStatus().equals(ProfileStatus.LOBBY) || profile.isStaffMode() || profile.isParty()) {
+        boolean lobbyOrQueue = profile.getStatus().equals(ProfileStatus.LOBBY) || profile.getStatus().equals(ProfileStatus.QUEUE);
+        if (!lobbyOrQueue || profile.isStaffMode() || profile.isParty()) {
             Common.sendMMMessage(player, LanguageManager.getString("CANT-USE-COMMAND"));
             return false;
+        }
+
+        if (args.length == 0) {
+            GUIManager.getInstance().searchGUI(GUIType.Queue_Ranked).open(player);
+            return true;
         }
 
         if (!player.hasPermission("zpp.bypass.ranked.requirements")) {
             Division requirement = DivisionManager.getInstance().getMinimumForRanked();
             if (requirement != null && !DivisionManager.getInstance().meetsMinimumForRanked(profile)) {
-                Common.sendMMMessage(player, LanguageManager.getString("COMMAND.QUEUES.RANKED.DIVISION-REQUIREMENT")
-                        .replace("%division_fullName%", requirement.getFullName())
-                        .replace("%division_shortName%", requirement.getShortName())
-                );
+                // Show progress towards requirement
+                sendRankedProgressMessage(player, profile, requirement);
 
                 return false;
             }
@@ -47,9 +51,7 @@ public class RankedCommand implements CommandExecutor {
             return false;
         }
 
-        if (args.length == 0) {
-            GUIManager.getInstance().searchGUI(GUIType.Queue_Ranked).open(player);
-        } else if (args.length == 1) {
+        if (args.length == 1) {
             NormalLadder ladder = LadderManager.getInstance().getLadder(args[0]);
             if (ladder == null) {
                 Common.sendMMMessage(player, LanguageManager.getString("COMMAND.QUEUES.RANKED.LADDER-NOT-FOUND").replace("%ladder%", args[0]));
@@ -60,6 +62,36 @@ public class RankedCommand implements CommandExecutor {
         }
 
         return true;
+    }
+
+    private void sendRankedProgressMessage(Player player, Profile profile, Division requirement) {
+        int currentExp = profile.getStats().getExperience();
+        int requiredExp = requirement.getExperience();
+        int currentWins = profile.getStats().getGlobalWins();
+        int requiredWins = requirement.getWin();
+
+        Common.sendMMMessage(player, "");
+        Common.sendMMMessage(player, LanguageManager.getString("COMMAND.QUEUES.RANKED.PROGRESS-HEADER"));
+
+        // Experience progress
+        int expProgress = Math.min(100, (int) ((double) currentExp / requiredExp * 100));
+        Common.sendMMMessage(player, LanguageManager.getString("COMMAND.QUEUES.RANKED.PROGRESS-EXP")
+                .replace("%current%", String.valueOf(currentExp))
+                .replace("%required%", String.valueOf(requiredExp))
+                .replace("%percent%", String.valueOf(expProgress))
+        );
+
+        // Wins progress (if wins are counted)
+        if (DivisionManager.getInstance().isCOUNT_BY_WINS()) {
+            int winsProgress = Math.min(100, (int) ((double) currentWins / requiredWins * 100));
+            Common.sendMMMessage(player, LanguageManager.getString("COMMAND.QUEUES.RANKED.PROGRESS-WINS")
+                    .replace("%current%", String.valueOf(currentWins))
+                    .replace("%required%", String.valueOf(requiredWins))
+                    .replace("%percent%", String.valueOf(winsProgress))
+            );
+        }
+
+        Common.sendMMMessage(player, "");
     }
 
 }

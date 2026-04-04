@@ -1,7 +1,7 @@
 package dev.nandi0813.practice.telemetry.config;
 
 import dev.nandi0813.practice.manager.backend.ConfigManager;
-import dev.nandi0813.practice.util.Common;
+import dev.nandi0813.practice.telemetry.bootstrap.TelemetryDebugLog;
 
 import java.net.URI;
 
@@ -9,6 +9,7 @@ public enum TelemetryConfig {
     ;
 
     private static final String DEFAULT_BASE_ENDPOINT = "https://nandi0813.hu";
+    //private static final String DEFAULT_BASE_ENDPOINT = "http://localhost:8000";
     private static final String ACCESS_TOKEN = "c22afd81c269b86c3c479cf1941c4aba5b842afda8228ad3540dab20e014b746";
 
     private static final String REGULAR_ENABLED_PATH = "TELEMETRY.ENABLED";
@@ -18,6 +19,7 @@ public enum TelemetryConfig {
     private static final String MATCHES_PATH = "matches/";
     private static final String AI_MATCHES_PATH = "ai-training/matches/";
     private static final String STATS_ENABLED_PATH = "stats-enabled/";
+    private static final String PRACTICE_STATS_UPLOAD_PATH = "practice-stats/upload/";
 
     public static boolean isRegularEnabled() {
         return ConfigManager.getBoolean(REGULAR_ENABLED_PATH);
@@ -48,6 +50,10 @@ public enum TelemetryConfig {
         return appendTelemetryPath(STATS_ENABLED_PATH);
     }
 
+    public static URI resolvePracticeStatsUploadEndpoint() {
+        return appendTelemetryPath(PRACTICE_STATS_UPLOAD_PATH);
+    }
+
     private static URI appendTelemetryPath(String suffix) {
         URI baseEndpoint = resolveConfiguredBaseEndpoint();
         if (baseEndpoint == null) {
@@ -69,7 +75,7 @@ public enum TelemetryConfig {
                     null
             );
         } catch (Exception exception) {
-            Common.sendConsoleMMMessage("<red>Invalid telemetry endpoint path (" + exception.getMessage() + ")");
+            TelemetryDebugLog.console("<red>Invalid telemetry endpoint path (" + exception.getMessage() + ")");
             return null;
         }
     }
@@ -105,12 +111,12 @@ public enum TelemetryConfig {
             URI uri = URI.create(endpoint.trim());
             String scheme = uri.getScheme();
             if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
-                Common.sendConsoleMMMessage("<red>Telemetry endpoint must use http/https: " + endpoint);
+                TelemetryDebugLog.console("<red>Telemetry endpoint must use http/https: " + endpoint);
                 return null;
             }
             return uri;
         } catch (Exception exception) {
-            Common.sendConsoleMMMessage("<red>Invalid telemetry endpoint: " + endpoint + " (" + exception.getMessage() + ")");
+            TelemetryDebugLog.console("<red>Invalid telemetry endpoint: " + endpoint + " (" + exception.getMessage() + ")");
             return null;
         }
     }

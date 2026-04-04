@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: true
-          fetch-depth: 200
+          fetch-depth: 0
 
       - name: Set up JDK 25
         uses: actions/setup-java@v4
@@ -139,13 +139,13 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        if: ${{ inputs.publish-artifacts == true }}
+        if: ${{ inputs.publish-artifacts == true && inputs.is-release-build == true }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.is-release-build == true && env.BUILD_VERSION || format('dev-{0}', github.sha) }}
-          name: ${{ inputs.is-release-build == true && format('ZonePractice Pro {0}', env.BUILD_VERSION) || format('Dev Build {0}', env.BUILD_VERSION) }}
+          tag_name: ${{ env.BUILD_VERSION }}
+          name: ZonePractice Pro ${{ env.BUILD_VERSION }}
           body: ${{ steps.changelog.outputs.notes }}
-          prerelease: ${{ !inputs.is-release-build }}
+          prerelease: false
           files: distribution/target/ZonePractice-Pro-${{ env.BUILD_VERSION }}.jar
 
       - name: Publish to Modrinth
@@ -165,4 +165,4 @@ jobs:
             purpur
             bukkit
             spigot
-          game-versions: '>=1.21.11'
+          game-versions: '1.21.11'

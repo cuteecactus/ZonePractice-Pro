@@ -7,9 +7,10 @@ import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.arena.arenas.FFAArena;
 import dev.nandi0813.practice.manager.backend.GUIFile;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
+import dev.nandi0813.practice.manager.fight.ffa.FFAFightPlayer;
+import dev.nandi0813.practice.manager.fight.match.MatchManager;
 import dev.nandi0813.practice.manager.fight.match.enums.TeamEnum;
 import dev.nandi0813.practice.manager.fight.match.util.KitUtil;
-import dev.nandi0813.practice.manager.fight.util.FightPlayer;
 import dev.nandi0813.practice.manager.fight.util.Stats.Statistic;
 import dev.nandi0813.practice.manager.gui.GUIItem;
 import dev.nandi0813.practice.manager.inventory.Inventory;
@@ -19,6 +20,7 @@ import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
 import dev.nandi0813.practice.manager.spectator.SpectatorManager;
+import dev.nandi0813.practice.telemetry.transport.stats.PracticeStatsTelemetryLogger;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.Cuboid;
 import dev.nandi0813.practice.util.entityhider.PlayerHider;
@@ -41,7 +43,7 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
     private static final Random random = new Random();
 
     private final Map<Player, NormalLadder> players = new HashMap<>();
-    private final Map<Player, FightPlayer> fightPlayers = new HashMap<>();
+    private final Map<Player, FFAFightPlayer> fightPlayers = new HashMap<>();
     private final Map<Player, Statistic> statistics = new HashMap<>();
 
     private final List<Player> spectators = new ArrayList<>();
@@ -120,7 +122,10 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
             return;
 
         players.put(player, ladder);
-        fightPlayers.put(player, new FightPlayer(player, this));
+        
+        // Use FFAFightPlayer to handle custom kit selection
+        FFAFightPlayer ffaFightPlayer = new FFAFightPlayer(player, this, ladder);
+        fightPlayers.put(player, ffaFightPlayer);
         statistics.put(player, new Statistic(ProfileManager.getInstance().getUuids().get(player)));
 
         // Hide the spectators
@@ -141,7 +146,12 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
         this.sendMessage(LanguageManager.getString("FFA.GAME.PLAYER-JOIN").replace("%player%", player.getName()), true);
 
         PlayerUtil.setFightPlayer(player);
-        KitUtil.loadDefaultLadderKit(player, TeamEnum.FFA, players.get(player));
+        this.addPlayerToBelowName(player);
+
+        // Show kit chooser or apply default kit
+        ffaFightPlayer.showKitChooserOrApplyKit();
+        
+        dev.nandi0813.practice.manager.fight.util.PlayerUtil.setAttackSpeed(player, ladder.getAttackCooldownModifier());
 
         ProfileManager.getInstance().getProfile(player).setStatus(ProfileStatus.FFA);
         SpectatorManager.getInstance().getSpectatorMenuGui().update();
@@ -154,6 +164,31 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
         players.put(player, ladder);
         PlayerUtil.setFightPlayer(player);
         KitUtil.loadDefaultLadderKit(player, TeamEnum.FFA, ladder);
+        dev.nandi0813.practice.manager.fight.util.PlayerUtil.setAttackSpeed(player, ladder.getAttackCooldownModifier());
+    }
+
+    /**
+     * Called when a player selects a custom kit from their inventory.
+     * Once a kit is selected, the player becomes a full combatant.
+     *
+     * @param player the player selecting a kit
+     * @param slot the inventory slot of the selected kit
+     */
+    public void playerSelectKit(Player player, int slot) {
+        FFAFightPlayer ffaFightPlayer = fightPlayers.get(player);
+        ffaFightPlayer.selectKit(slot);
+    }
+
+    /**
+     * Returns whether a player is waiting to select a kit.
+     * Players waiting for kit selection cannot be hurt or interact with others.
+     *
+     * @param player the player to check
+     * @return true if player is waiting for kit selection, false otherwise
+     */
+    public boolean isPlayerWaitingForKitSelection(Player player) {
+        FFAFightPlayer ffaFightPlayer = fightPlayers.get(player);
+        return ffaFightPlayer.isWaitingForKitSelection();
     }
 
     public void removePlayer(Player player) {
@@ -175,6 +210,8 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
         players.remove(player);
         fightPlayers.remove(player);
         statistics.remove(player);
+        this.removePlayerFromBelowName(player);
+        dev.nandi0813.practice.manager.fight.util.PlayerUtil.resetAttackSpeed(player);
 
         InventoryManager.getInstance().setLobbyInventory(player, true);
         SpectatorManager.getInstance().getSpectatorMenuGui().update();
@@ -198,15 +235,19 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
         }
 
         fightPlayers.get(player).die(deathMessage, statistics.get(player));
-        fightPlayers.get(player).getProfile().getStats().getLadderStat(players.get(player)).increaseDeaths();
+        Profile deadProfile = fightPlayers.get(player).getProfile();
+        deadProfile.getStats().getLadderStat(players.get(player)).increaseDeaths();
+        PracticeStatsTelemetryLogger.markDirty(deadProfile);
 
         if (killer != null) {
-            fightPlayers.get(killer).getProfile().getStats().getLadderStat(players.get(killer)).increaseKills();
+            Profile killerProfile = fightPlayers.get(killer).getProfile();
+            killerProfile.getStats().getLadderStat(players.get(killer)).increaseKills();
+            PracticeStatsTelemetryLogger.markDirty(killerProfile);
 
             playDeathEffect(killer, player);
 
             if (arena.isReKitAfterKill()) {
-                KitUtil.loadDefaultLadderKit(killer, TeamEnum.FFA, players.get(killer));
+                applySelectedOrDefaultKit(killer);
             }
 
             if (arena.isHealthResetOnKill()) {
@@ -218,10 +259,24 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
             this.removePlayer(player);
         } else {
             PlayerUtil.setFightPlayer(player);
-            KitUtil.loadDefaultLadderKit(player, TeamEnum.FFA, players.get(player));
+            applySelectedOrDefaultKit(player);
+            dev.nandi0813.practice.manager.fight.util.PlayerUtil.setAttackSpeed(player, players.get(player).getAttackCooldownModifier());
 
             Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () ->
                     teleportPlayer(player), 1L);
+        }
+    }
+
+    private void applySelectedOrDefaultKit(Player player) {
+        FFAFightPlayer ffaFightPlayer = fightPlayers.get(player);
+        if (ffaFightPlayer != null) {
+            ffaFightPlayer.showKitChooserOrApplyKit();
+            return;
+        }
+
+        NormalLadder ladder = players.get(player);
+        if (ladder != null) {
+            KitUtil.loadDefaultLadderKit(player, TeamEnum.FFA, ladder);
         }
     }
 
@@ -359,6 +414,7 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
         this.spectators.add(player);
         SpectatorManager.getInstance().getSpectators().put(player, this);
         profile.setStatus(ProfileStatus.SPECTATE);
+        this.addPlayerToBelowName(player);
 
         // Hide spectator from players.
         for (Player eventPlayer : this.players.keySet()) {
@@ -405,6 +461,7 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
 
         this.spectators.remove(player);
         SpectatorManager.getInstance().getSpectators().remove(player);
+        this.removePlayerFromBelowName(player);
 
         if (ZonePractice.getInstance().isEnabled() && player.isOnline()) {
             InventoryManager.getInstance().setLobbyInventory(player, true);
@@ -448,6 +505,22 @@ public class FFA implements Spectatable, dev.nandi0813.api.Interface.FFA {
     @Override
     public Cuboid getCuboid() {
         return arena.getCuboid();
+    }
+
+    private void addPlayerToBelowName(Player player) {
+        if (!this.arena.isHealthBelowName()) {
+            return;
+        }
+
+        MatchManager.getInstance().getBelowNameManager().initForUser(player);
+    }
+
+    private void removePlayerFromBelowName(Player player) {
+        if (!this.arena.isHealthBelowName()) {
+            return;
+        }
+
+        MatchManager.getInstance().getBelowNameManager().cleanUpForUser(player);
     }
 
 }
