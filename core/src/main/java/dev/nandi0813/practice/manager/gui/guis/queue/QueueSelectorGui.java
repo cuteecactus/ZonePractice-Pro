@@ -614,15 +614,26 @@ public abstract class QueueSelectorGui extends GUI {
             return;
         }
 
+        Inventory expectedInventory = this.gui.get(page);
+        if (expectedInventory == null || expectedInventory != inventory) {
+            return;
+        }
+
         Map<Integer, NormalLadder> ladders = pageLadderSlots.get(page);
         if (ladders == null || ladders.isEmpty()) {
             return;
         }
 
         Queue queue = QueueManager.getInstance().getQueue(player);
+        int inventorySize = inventory.getSize();
 
         for (Map.Entry<Integer, NormalLadder> entry : ladders.entrySet()) {
-            ItemStack item = inventory.getItem(entry.getKey());
+            int slot = entry.getKey();
+            if (slot < 0 || slot >= inventorySize) {
+                continue;
+            }
+
+            ItemStack item = inventory.getItem(slot);
             if (item == null || item.getType() == Material.AIR) {
                 continue;
             }
@@ -633,7 +644,7 @@ public abstract class QueueSelectorGui extends GUI {
                     && QueueManager.getInstance().isMultiQueueAllowed(player);
 
             setItemGlow(item, selected);
-            inventory.setItem(entry.getKey(), item);
+            inventory.setItem(slot, item);
         }
     }
 
@@ -768,6 +779,11 @@ public abstract class QueueSelectorGui extends GUI {
                                   List<String> ladderNames, List<Integer> ladderSlots) {
     }
 }
+
+
+
+
+
 
 
 
