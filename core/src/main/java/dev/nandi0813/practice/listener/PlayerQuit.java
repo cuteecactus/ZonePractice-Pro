@@ -1,6 +1,7 @@
 package dev.nandi0813.practice.listener;
 
 import dev.nandi0813.practice.ZonePractice;
+import dev.nandi0813.practice.command.privatemessage.MessageCommand;
 import dev.nandi0813.practice.manager.fight.match.MatchManager;
 import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.party.Party;
@@ -8,7 +9,9 @@ import dev.nandi0813.practice.manager.party.PartyManager;
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
+import dev.nandi0813.practice.manager.server.ServerManager;
 import dev.nandi0813.practice.telemetry.transport.stats.PracticeStatsTelemetryLogger;
+import dev.nandi0813.practice.util.cooldown.PlayerCooldown;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -24,6 +27,16 @@ public class PlayerQuit implements Listener {
         e.setQuitMessage(null);
         final Player player = e.getPlayer();
         NametagManager.getInstance().onPlayerQuit(player);
+        ServerManager.getInstance().onPlayerQuit(player);
+        PlayerCooldown.clearPlayer(player);
+
+        StatisticListener.getCURRENT_CPS().remove(player);
+        StatisticListener.getCPS().remove(player);
+        StatisticListener.getCURRENT_COMBO().remove(player);
+
+        MessageCommand.latestMessage.remove(player);
+        MessageCommand.latestMessage.values().removeIf(target -> target.equals(player));
+
         final Profile profile = ProfileManager.getInstance().getProfile(player);
         final Party party = PartyManager.getInstance().getParty(player);
 
@@ -49,8 +62,19 @@ public class PlayerQuit implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerKick(PlayerKickEvent e) {
-        NametagManager.getInstance().onPlayerQuit(e.getPlayer());
-        MatchManager.getInstance().invalidateRematchByPlayer(e.getPlayer());
+        Player player = e.getPlayer();
+        NametagManager.getInstance().onPlayerQuit(player);
+        ServerManager.getInstance().onPlayerQuit(player);
+        PlayerCooldown.clearPlayer(player);
+
+        StatisticListener.getCURRENT_CPS().remove(player);
+        StatisticListener.getCPS().remove(player);
+        StatisticListener.getCURRENT_COMBO().remove(player);
+
+        MessageCommand.latestMessage.remove(player);
+        MessageCommand.latestMessage.values().removeIf(target -> target.equals(player));
+
+        MatchManager.getInstance().invalidateRematchByPlayer(player);
     }
 
 }

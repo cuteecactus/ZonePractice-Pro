@@ -396,6 +396,7 @@ public class FightChangeOptimized {
             if (entity != null && entity.isValid()) {
                 // Skip hologram text displays
                 if (isHologramTextDisplay(entity)) continue;
+                BlockUtil.clearAllMetadata(entity);
                 entity.remove();
             }
         }
@@ -416,6 +417,7 @@ public class FightChangeOptimized {
                     if (entity instanceof Player) continue;
                     if (isHologramTextDisplay(entity)) continue;
                     if (entity.isValid()) {
+                        BlockUtil.clearAllMetadata(entity);
                         entity.remove();
                     }
                 }

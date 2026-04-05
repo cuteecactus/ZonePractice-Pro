@@ -248,6 +248,15 @@ public class ServerManager implements Listener {
         goldenHead.reload();
     }
 
+    public void onPlayerQuit(Player player) {
+        if (player == null) {
+            return;
+        }
+
+        inWorld.remove(player);
+        onlineStaffs.remove(player);
+    }
+
     public void alertPlayers(String permission, String message) {
         Bukkit.getScheduler().runTaskAsynchronously(ZonePractice.getInstance(), () ->
         {
