@@ -1,4 +1,4 @@
-VERSION: 36
+VERSION: 37
 
 CONSOLE-NAME: "<red>Console"
 CANT-USE-CONSOLE: "<red>You can't use this command from the console."
@@ -1092,6 +1092,7 @@ LADDER:
       NO-AVAILABLE-ARENA: "<red>There is no available arena for your game."
       ERROR: "<red>Something went wrong."
       TARGET-PARTY-DISBANDED: "<red>The target party has been disbanded."
+      NO-CUSTOM-KIT-SELECTED: "<red>You need to select a custom kit first."
   LADDER-TYPES:
     BASIC:
       NAME: "Basic"
