@@ -2,6 +2,7 @@ package dev.nandi0813.practice.listener;
 
 import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.fight.match.MatchManager;
+import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.party.Party;
 import dev.nandi0813.practice.manager.party.PartyManager;
 import dev.nandi0813.practice.manager.profile.Profile;
@@ -22,6 +23,7 @@ public class PlayerQuit implements Listener {
     public void onPlayerQuit(PlayerQuitEvent e) {
         e.setQuitMessage(null);
         final Player player = e.getPlayer();
+        NametagManager.getInstance().onPlayerQuit(player);
         final Profile profile = ProfileManager.getInstance().getProfile(player);
         final Party party = PartyManager.getInstance().getParty(player);
 
@@ -47,6 +49,7 @@ public class PlayerQuit implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerKick(PlayerKickEvent e) {
+        NametagManager.getInstance().onPlayerQuit(e.getPlayer());
         MatchManager.getInstance().invalidateRematchByPlayer(e.getPlayer());
     }
 

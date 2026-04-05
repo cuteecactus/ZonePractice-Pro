@@ -6,11 +6,14 @@ import dev.nandi0813.practice.util.PermanentConfig;
 import lombok.Getter;
 import me.neznamy.tab.api.TabAPI;
 import me.neznamy.tab.api.TabPlayer;
+import me.neznamy.tab.api.event.EventBus;
+import me.neznamy.tab.api.event.player.PlayerLoadEvent;
 import me.neznamy.tab.api.nametag.NameTagManager;
 import me.neznamy.tab.api.tablist.TabListFormatManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 /**
@@ -65,6 +68,29 @@ public class TabIntegration {
         this.tabAPI = api;
         this.available = isAvailable;
         this.tablistFormattingEnabled = tablistEnabled;
+
+        if (this.available) {
+            registerVanillaNameHider();
+            hideNametagsForOnlinePlayers();
+        }
+    }
+
+    private void registerVanillaNameHider() {
+        try {
+            EventBus eventBus = tabAPI.getEventBus();
+            if (eventBus == null) {
+                return;
+            }
+
+            eventBus.register(PlayerLoadEvent.class, event -> hideNametag(event.getPlayer()));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void hideNametagsForOnlinePlayers() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            hideNametag(player);
+        }
     }
 
     /**
@@ -142,6 +168,30 @@ public class TabIntegration {
 
         } catch (Exception e) {
             // Silently fail - TAB integration is best-effort
+        }
+    }
+
+    public void hideNametag(Player player) {
+        if (!available || player == null) return;
+
+        try {
+            TabPlayer tabPlayer = tabAPI.getPlayer(player.getUniqueId());
+            if (tabPlayer == null) return;
+
+            hideNametag(tabPlayer);
+        } catch (Exception ignored) {
+        }
+    }
+
+    public void hideNametag(TabPlayer tabPlayer) {
+        if (!available || tabPlayer == null) return;
+
+        try {
+            NameTagManager nameTagManager = tabAPI.getNameTagManager();
+            if (nameTagManager == null) return;
+
+            nameTagManager.hideNameTag(tabPlayer);
+        } catch (Exception ignored) {
         }
     }
 
