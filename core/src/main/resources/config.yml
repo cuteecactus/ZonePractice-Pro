@@ -1,4 +1,4 @@
-VERSION: 52
+VERSION: 53
 
 # Mysql database setup.
 MYSQL-DATABASE:
@@ -283,13 +283,16 @@ MATCH-SETTINGS:
     ROUND-SELECTOR:
       MAX: 10
       MIN: 1 # Can't be lower than 1.
-  ENDERPEARL:
-    COOLDOWN: 13 # This is the default cooldown. You can change it in the ladder settings.
-    EXP-BAR: true # Countdown shows on exp bar.
-  WIND-CHARGE:
-    COOLDOWN: 0 # Default wind charge cooldown in seconds. You can change it in the ladder settings.
-  FIREWORK-ROCKET:
-    COOLDOWN: 1 # Cooldown in seconds for using firework rockets with elytra. Default is 1 second.
+  COOLDOWN:
+    ENDER-PEARL:
+      SECONDS: 13.0 # This is the default cooldown. You can change it in the ladder settings.
+      EXP-BAR: true # Countdown shows on exp bar.
+    WIND-CHARGE:
+      SECONDS: 0.5 # Default wind charge cooldown in seconds. You can change it in the ladder settings.
+    FIREWORK-ROCKET:
+      SECONDS: 1.0 # Cooldown in seconds for using firework rockets with elytra. Default is 1 second.
+    GOLDEN-APPLE:
+      SECONDS: 0 # Cooldown in seconds for using golden apples. Default is 0 seconds (no cooldown).
   FIREBALL-FIGHT: # These are multiplier values, so please test what is optimal for you and don't change them too much at once or the difference will multiply.
     FIREBALL-SPEED: 1.0
     FIREBALL-YIELD: 1.8
@@ -370,7 +373,6 @@ FFA:
   HEALTH-RESET-ON-KILL: false # Default for newly created FFA arenas. If enabled, killers are fully healed on kill.
   HEALTH-BELOW-NAME: false # Default for newly created FFA arenas. If enabled, players see heart indicators below names.
   DISPLAY-ARROW-HIT-HEALTH: true # If true, the player will see the health of the player they hit.
-  ENDER-PEARL-EXP-BAR: true # If true, the ender pearl cooldown will be displayed on the exp bar.
   ALLOW-DESTROYABLE-BLOCK: true # If true, player can destroy the fixed blocks in the arena that their ladder has.
   ENABLE_TNT: true # If true, players can use TNT in the arena (ONLY IN BUILD MODE).
 #

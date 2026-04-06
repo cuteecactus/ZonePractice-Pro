@@ -23,9 +23,9 @@ public class CustomLadder extends Ladder {
     private static final boolean DEFAULT_BUILD = PlayerKitManager.getInstance().getBoolean("DEFAULT-SETTINGS.BUILD");
     private static final int DEFAULT_ROUNDS = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.ROUNDS");
     private static final double DEFAULT_HITDELAY = convertHitDelayToMultiplier(PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.HITDELAY"));
-    private static final int DEFAULT_EP_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.EP_COOLDOWN");
-    private static final int DEFAULT_GA_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.GA_COOLDOWN");
-    private static final int DEFAULT_WIND_CHARGE_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.WIND_CHARGE_COOLDOWN");
+    private static final double DEFAULT_EP_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.EP_COOLDOWN");
+    private static final double DEFAULT_GA_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.GA_COOLDOWN");
+    private static final double DEFAULT_WIND_CHARGE_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.WIND_CHARGE_COOLDOWN");
     private static final boolean DEFAULT_HEALTH_BELOW_NAME = PlayerKitManager.getInstance().getBoolean("DEFAULT-SETTINGS.HEALTH_BELOW_NAME");
 
     private static final String NAME_PATH = ".settings.name";

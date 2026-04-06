@@ -42,14 +42,16 @@ public abstract class Ladder {
     protected double attackCooldownModifier = 1.0;
     @Setter
     protected int rounds = 1;
+
+    // Cooldowns
     @Setter
-    protected int enderPearlCooldown = ConfigManager.getInt("MATCH-SETTINGS.ENDERPEARL.COOLDOWN");
+    protected double enderPearlCooldown = ConfigManager.getDouble("MATCH-SETTINGS.COOLDOWN.ENDER-PEARL.SECONDS");
     @Setter
-    protected int goldenAppleCooldown = 0;
+    protected double goldenAppleCooldown = ConfigManager.getDouble("MATCH-SETTINGS.COOLDOWN.GOLDEN-APPLE.SECONDS");
     @Setter
-    protected int fireworkRocketCooldown = ConfigManager.getInt("MATCH-SETTINGS.FIREWORK-ROCKET.COOLDOWN");
+    protected double fireworkRocketCooldown = ConfigManager.getDouble("MATCH-SETTINGS.COOLDOWN.FIREWORK-ROCKET.SECONDS");
     @Setter
-    protected int windChargeCooldown = ConfigManager.getInt("MATCH-SETTINGS.WIND-CHARGE.COOLDOWN");
+    protected double windChargeCooldown = ConfigManager.getDouble("MATCH-SETTINGS.COOLDOWN.WIND-CHARGE.SECONDS");
 
     protected List<MatchType> matchTypes = new ArrayList<>();
 
