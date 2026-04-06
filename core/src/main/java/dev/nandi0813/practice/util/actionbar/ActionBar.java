@@ -24,6 +24,7 @@ public class ActionBar {
     private final Profile profile;
     private static final int TICK_PERIOD = 2;
     private static final long INFINITE_EXPIRY = Long.MAX_VALUE;
+    private static final long KEEPALIVE_INTERVAL_MILLIS = 1200L;
     private static final int DEBUG_HISTORY_LIMIT = 40;
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
 
@@ -36,6 +37,8 @@ public class ActionBar {
 
     private volatile String lastWinnerId = "-";
     private volatile String lastWinnerPlainText = "";
+    private volatile String lastSentSignature = "";
+    private volatile boolean lastSentWasEmpty = true;
     private volatile long lastSendAtMillis = 0L;
 
     /**
@@ -67,6 +70,16 @@ public class ActionBar {
             return;
         }
 
+        ActionMessage previous = activeMessages.get(id);
+        boolean infiniteDuration = duration < 0;
+        if (previous != null
+                && previous.priority == priority
+                && previous.plainText.equals(plainText)
+                && previous.isInfinite() == infiniteDuration) {
+            debug("SET_SKIPPED", "id=" + id + ", reason=unchanged");
+            return;
+        }
+
         long expiresAtMillis = duration < 0
                 ? INFINITE_EXPIRY
                 : (System.currentTimeMillis() + (Math.max(1, duration) * 1000L));
@@ -81,7 +94,7 @@ public class ActionBar {
         debug("SET", "id=" + id + ", duration=" + duration + ", priority=" + priority + ", chars=" + plainText.length() + ", active=" + activeMessages.size());
 
         startRunnable();
-        sendHighestPriority(profile.getPlayer().getPlayer()); // immediate update
+        sendHighestPriority(profile.getPlayer().getPlayer(), true); // immediate update without runnable overlap
     }
 
     /**
@@ -99,10 +112,9 @@ public class ActionBar {
         Player player = profile.getPlayer().getPlayer();
         if (player != null && player.isOnline()) {
             if (activeMessages.isEmpty()) {
-                player.sendActionBar(Component.empty());
-                debug("CLEAR", "removeMessage emptied actionbar");
+                clearActionBarIfNeeded(player, "removeMessage emptied actionbar");
             } else {
-                sendHighestPriority(player);
+                sendHighestPriority(player, true);
             }
         }
 
@@ -133,7 +145,8 @@ public class ActionBar {
             }
         };
 
-        actionBarRunnable.runTaskTimer(ZonePractice.getInstance(), 0L, TICK_PERIOD); // every 2 ticks (~0.1 sec)
+        // Start on next period because setMessage() already performs the immediate send path.
+        actionBarRunnable.runTaskTimer(ZonePractice.getInstance(), TICK_PERIOD, TICK_PERIOD);
     }
 
     /**
@@ -156,6 +169,7 @@ public class ActionBar {
         if (player == null || !player.isOnline()) {
             // Do not keep stale state/runnables around for offline players.
             activeMessages.clear();
+            resetLastSentState();
             debug("OFFLINE_CLEAR", "player offline while actionbar active");
             stopRunnable();
             return;
@@ -164,10 +178,9 @@ public class ActionBar {
         pruneExpiredMessages();
 
         if (!activeMessages.isEmpty()) {
-            sendHighestPriority(player);
+            sendHighestPriority(player, false);
         } else {
-            player.sendActionBar(Component.empty());
-            debug("CLEAR", "tick emptied actionbar");
+            clearActionBarIfNeeded(player, "tick emptied actionbar");
             stopRunnable();
         }
     }
@@ -181,7 +194,7 @@ public class ActionBar {
      * Sends the highest priority message to the player.
      * If multiple messages share the same priority, the most recently updated one is shown.
      */
-    private void sendHighestPriority(Player player) {
+    private void sendHighestPriority(Player player, boolean force) {
         if (player == null || !player.isOnline()) return;
 
         String highestId = null;
@@ -203,14 +216,28 @@ public class ActionBar {
         }
 
         if (highest != null) {
+            long now = System.currentTimeMillis();
+            String signature = buildSignature(highestId, highest);
+            boolean winnerChanged = !signature.equals(lastSentSignature);
+            boolean keepAliveDue = (now - lastSendAtMillis) >= KEEPALIVE_INTERVAL_MILLIS;
+
+            if (!force && !winnerChanged && !keepAliveDue) {
+                return;
+            }
+
             try {
                 player.sendActionBar(highest.component);
                 lastWinnerId = highestId == null ? "-" : highestId;
                 lastWinnerPlainText = highest.plainText;
-                lastSendAtMillis = System.currentTimeMillis();
+                lastSentSignature = signature;
+                lastSentWasEmpty = false;
+                lastSendAtMillis = now;
                 debug("SEND", "winner=" + lastWinnerId
                         + ", priority=" + highest.priority
                         + ", chars=" + highest.plainText.length()
+                        + ", changed=" + winnerChanged
+                        + ", keepAliveDue=" + keepAliveDue
+                        + ", forced=" + force
                         + ", topInventory=" + getOpenTopInventoryType(player)
                         + ", active=" + activeMessages.size());
             } catch (Throwable throwable) {
@@ -222,11 +249,35 @@ public class ActionBar {
         }
     }
 
+    private String buildSignature(String id, ActionMessage message) {
+        return Objects.toString(id, "-") + "|" + message.priority + "|" + message.plainText;
+    }
+
+    private void clearActionBarIfNeeded(Player player, String reason) {
+        if (lastSentWasEmpty) {
+            return;
+        }
+
+        player.sendActionBar(Component.empty());
+        resetLastSentState();
+        debug("CLEAR", reason);
+    }
+
+    private void resetLastSentState() {
+        lastSentSignature = "";
+        lastSentWasEmpty = true;
+        lastWinnerId = "-";
+        lastWinnerPlainText = "";
+        lastSendAtMillis = 0L;
+    }
+
     public String getDebugStateSnapshot() {
         return "active=" + activeMessages.size()
                 + ", runnable=" + (actionBarRunnable != null)
                 + ", lastWinner=" + lastWinnerId
                 + ", lastWinnerText='" + lastWinnerPlainText + "'"
+                + ", lastSentSignature='" + lastSentSignature + "'"
+                + ", lastSentWasEmpty=" + lastSentWasEmpty
                 + ", lastSendAt=" + lastSendAtMillis;
     }
 
@@ -319,6 +370,10 @@ public class ActionBar {
             this.expiresAtMillis = expiresAtMillis;
             this.priority = priority;
             this.updatedAtSequence = updatedAtSequence;
+        }
+
+        private boolean isInfinite() {
+            return expiresAtMillis == INFINITE_EXPIRY;
         }
 
         private boolean isExpired(long now) {
