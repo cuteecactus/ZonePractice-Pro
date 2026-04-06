@@ -219,7 +219,19 @@ public class Profile {
             this.customLadders.removeLast();
         }
 
-        this.playerCustomKitSelector = new PlayerCustomKitSelector(this);
+        // Invalidate the selector so it gets recreated on next access (lazy-loading)
+        this.playerCustomKitSelector = null;
+    }
+
+    /**
+     * Lazily loads and returns the PlayerCustomKitSelector.
+     * Creates it only when first accessed to save RAM for offline players.
+     */
+    public PlayerCustomKitSelector getPlayerCustomKitSelector() {
+        if (this.playerCustomKitSelector == null) {
+            this.playerCustomKitSelector = new PlayerCustomKitSelector(this);
+        }
+        return this.playerCustomKitSelector;
     }
 
     public void setSelectedCustomLadder(CustomLadder customLadder) {

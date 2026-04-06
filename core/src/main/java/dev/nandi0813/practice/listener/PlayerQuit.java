@@ -53,6 +53,8 @@ public class PlayerQuit implements Listener {
             int customKitPerm = profile.getCustomKitPerm();
             if (customKitPerm > 0) profile.setAllowedCustomKits(customKitPerm);
 
+            profile.setPlayerCustomKitSelector(null);
+
             if (ZonePractice.getInstance().isEnabled()) {
                 Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () ->
                         profile.setStatus(ProfileStatus.OFFLINE), 5L);
