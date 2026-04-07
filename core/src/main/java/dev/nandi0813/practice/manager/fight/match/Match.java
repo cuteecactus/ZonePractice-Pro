@@ -15,6 +15,8 @@ import dev.nandi0813.practice.manager.fight.match.type.duel.Duel;
 import dev.nandi0813.practice.manager.fight.match.util.MatchFightPlayer;
 import dev.nandi0813.practice.manager.fight.match.util.MatchUtil;
 import dev.nandi0813.practice.manager.fight.match.util.TeamUtil;
+import dev.nandi0813.practice.manager.fight.util.ChangedBlock;
+import dev.nandi0813.practice.manager.fight.util.DeathCause;
 import dev.nandi0813.practice.manager.fight.util.Stats.Statistic;
 import dev.nandi0813.practice.manager.gui.GUIItem;
 import dev.nandi0813.practice.manager.gui.guis.MatchStatsGui;
@@ -29,8 +31,7 @@ import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
 import dev.nandi0813.practice.manager.spectator.SpectatorManager;
-import dev.nandi0813.practice.module.interfaces.ChangedBlock;
-import dev.nandi0813.practice.module.util.ClassImport;
+import dev.nandi0813.practice.telemetry.transport.stats.PracticeStatsTelemetryLogger;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.Cuboid;
 import dev.nandi0813.practice.util.StringUtil;
@@ -67,7 +68,7 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
 
     // Round
     protected final int winsNeeded;
-    protected final Map<Integer, Round> rounds = new HashMap<>();
+    protected final Map<Integer, Round> rounds = new java.util.concurrent.ConcurrentHashMap<>();
 
     // Player variables
     protected final Map<Player, MatchFightPlayer> matchPlayers = new HashMap<>();
@@ -81,12 +82,32 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
     // Fight change
     private final FightChangeOptimized fightChange;
 
+    /** Tracks the last player that dealt damage to another player, for void-kill attribution. */
+    private final Map<UUID, UUID> lastAttackerMap = new HashMap<>();
+    /** Timestamp (ms) of the last attacker hit, keyed by victim UUID. */
+    private final Map<UUID, Long> lastAttackerTime = new HashMap<>();
+    /** Tracks whether a player's last registered death in this match was void-related. */
+    private final Map<UUID, Boolean> lastDeathWasVoid = new HashMap<>();
+    /** How long (ms) a last-attacker is considered valid for void attribution. */
+    private static final long LAST_ATTACKER_EXPIRY_MS = 4_000L;
+
+    /** True while the arena is being rolled back between rounds — players are frozen. */
+    @Getter
+    private boolean rollingBack = false;
+
     @Setter
     protected MatchStatus status;
 
     protected Match(final Ladder ladder, final Arena arena, final List<Player> players, final int winsNeeded) {
         this.id = MatchUtil.getMatchID();
-        this.arena = arena.getAvailableArena();
+        NormalArena resolvedArena = arena != null ? arena.getAvailableArena() : null;
+        if (resolvedArena == null) {
+            String ladderName = ladder != null ? ladder.getName() : "unknown";
+            String arenaName = arena != null ? arena.getName() : "null";
+            throw new IllegalStateException("Cannot create match without available arena (ladder=" + ladderName + ", arena=" + arenaName + ")");
+        }
+
+        this.arena = resolvedArena;
         this.ladder = ladder;
         this.winsNeeded = winsNeeded;
         this.players = new ArrayList<>(players);
@@ -96,7 +117,7 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
         }
         this.fightChange = new FightChangeOptimized(this);
 
-        if (arena.getSideBuildLimit() > 0)
+        if (arena != null && arena.getSideBuildLimit() > 0)
             this.sideBuildLimit = MatchUtil.getSideBuildLimitCube(this.arena.getCuboid().clone(), arena.getSideBuildLimit());
         else
             this.sideBuildLimit = null;
@@ -153,16 +174,16 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
             if (players.contains(player)) {
                 for (Entity entity : arena.getCuboid().getEntities()) {
                     if (!(entity instanceof Player)) {
-                        ClassImport.getClasses().getEntityHider().hideEntity(player, entity);
+                        ZonePractice.getEntityHider().hideEntity(player, entity);
                     }
                 }
             } else if (spectators.contains(player)) {
                 for (Entity entity : arena.getCuboid().getEntities()) {
                     if (!(entity instanceof Player)) {
                         if (fightChange.containsEntity(entity))
-                            ClassImport.getClasses().getEntityHider().showEntity(player, entity);
+                            ZonePractice.getEntityHider().showEntity(player, entity);
                         else
-                            ClassImport.getClasses().getEntityHider().hideEntity(player, entity);
+                            ZonePractice.getEntityHider().hideEntity(player, entity);
                     }
                 }
             }
@@ -177,21 +198,126 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
 
     public abstract void teleportPlayer(Player player);
 
+    /**
+     * Records that {@code attacker} last hit {@code victim}.
+     * Called from damage listeners so void deaths can be attributed correctly.
+     */
+    public void recordAttack(Player victim, Player attacker) {
+        lastAttackerMap.put(victim.getUniqueId(), attacker.getUniqueId());
+        lastAttackerTime.put(victim.getUniqueId(), System.currentTimeMillis());
+    }
+
+    /**
+     * Returns the last player who hit {@code victim} within the expiry window,
+     * or {@code null} if there is none.
+     */
+    public @org.jetbrains.annotations.Nullable Player getLastAttacker(Player victim) {
+        Long time = lastAttackerTime.get(victim.getUniqueId());
+        if (time == null || System.currentTimeMillis() - time > LAST_ATTACKER_EXPIRY_MS) return null;
+        UUID attackerUuid = lastAttackerMap.get(victim.getUniqueId());
+        if (attackerUuid == null) return null;
+        for (Player p : players) {
+            if (attackerUuid.equals(p.getUniqueId())) return p;
+        }
+        return null;
+    }
+
+    public boolean wasLastDeathVoid(Player player) {
+        return lastDeathWasVoid.getOrDefault(player.getUniqueId(), false);
+    }
+
+    public void clearRoundDeathCauses() {
+        lastDeathWasVoid.clear();
+    }
+
+    private static boolean isVoidDeathMessage(String deathMessage) {
+        if (deathMessage == null) {
+            return false;
+        }
+
+        if (deathMessage.equals(DeathCause.VOID.getMessage())) {
+            return true;
+        }
+
+        String voidByPlayerPattern = DeathCause.VOID_BY_PLAYER.getMessage();
+        if (voidByPlayerPattern == null) {
+            return false;
+        }
+
+        int placeholderIndex = voidByPlayerPattern.indexOf("%killer%");
+        if (placeholderIndex < 0) {
+            return deathMessage.equals(voidByPlayerPattern);
+        }
+
+        String prefix = voidByPlayerPattern.substring(0, placeholderIndex);
+        String suffix = voidByPlayerPattern.substring(placeholderIndex + "%killer%".length());
+        return deathMessage.startsWith(prefix) && deathMessage.endsWith(suffix);
+    }
+
     public void killPlayer(Player player, Player killer, String deathMessage) {
         if (this.getCurrentStat(player).isSet())
             return;
 
-        deathMessage = TeamUtil.replaceTeamNames(deathMessage, player, this instanceof Team team ? team.getTeam(player) : TeamEnum.FFA);
+        boolean voidDeath = isVoidDeathMessage(deathMessage);
+
+        // If no explicit killer and the death message is the plain void message,
+        // check whether a recent attacker should be credited instead.
+        if (killer == null) {
+            Player lastAttacker = getLastAttacker(player);
+            if (lastAttacker != null && !lastAttacker.equals(player) && deathMessage != null
+                    && deathMessage.equals(dev.nandi0813.practice.manager.fight.util.DeathCause.VOID.getMessage())) {
+                killer = lastAttacker;
+                voidDeath = true;
+                deathMessage = dev.nandi0813.practice.manager.fight.util.DeathCause.VOID_BY_PLAYER
+                        .getMessage()
+                        .replace("%killer%", killer.getName());
+            }
+        }
+
+        lastDeathWasVoid.put(player.getUniqueId(), voidDeath);
+
+        deathMessage = TeamUtil.replaceTeamNames((deathMessage != null ? deathMessage : ""), player, this instanceof Team team ? team.getTeam(player) : TeamEnum.FFA);
         matchPlayers.get(player).die(deathMessage, this.getCurrentStat(player));
 
         if (ladder instanceof NormalLadder) {
             if (killer != null) {
-                matchPlayers.get(killer).getProfile().getStats().getLadderStat((NormalLadder) ladder).increaseKills();
+                Profile killerProfile = matchPlayers.get(killer).getProfile();
+                killerProfile.getStats().getLadderStat((NormalLadder) ladder).increaseKills();
+                PracticeStatsTelemetryLogger.markDirty(killerProfile);
             }
-            matchPlayers.get(player).getProfile().getStats().getLadderStat((NormalLadder) ladder).increaseDeaths();
+            Profile deadProfile = matchPlayers.get(player).getProfile();
+            deadProfile.getStats().getLadderStat((NormalLadder) ladder).increaseDeaths();
+            PracticeStatsTelemetryLogger.markDirty(deadProfile);
         }
 
+        playDeathEffect(killer, player);
+
         killPlayer(player, deathMessage);
+    }
+
+    private void playDeathEffect(Player killer, Player victim) {
+        if (killer == null || victim == null) {
+            return;
+        }
+
+        try {
+            Profile killerProfile = matchPlayers.containsKey(killer)
+                    ? matchPlayers.get(killer).getProfile()
+                    : ProfileManager.getInstance().getProfile(killer);
+
+            if (killerProfile == null || killerProfile.getCosmeticsData() == null) {
+                return;
+            }
+
+            var deathEffect = killerProfile.getCosmeticsData().getDeathEffect();
+            if (deathEffect == null) {
+                return;
+            }
+
+            deathEffect.play(victim.getLocation(), getPeople());
+        } catch (Exception ignored) {
+            // Cosmetic effects should never break combat flow.
+        }
     }
 
     protected abstract void killPlayer(Player player, String deathMessage);
@@ -218,8 +344,8 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
         for (Player spectator : new ArrayList<>(spectators))
             removeSpectator(spectator);
 
-        // Reset the arena.
-        resetMap();
+        // Reset the arena and only make it reusable after rollback completes.
+        resetMap(() -> this.arena.setAvailable(true));
 
         this.cancel();
 
@@ -229,8 +355,7 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
             }
         }
 
-        // Set arena to available
-        this.arena.setAvailable(true);
+        // Availability is flipped in the reset callback above.
     }
 
     /*
@@ -275,15 +400,6 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
     }
 
     /**
-     * Gets the ladder as a ScoringLadder if applicable.
-     *
-     * @return Optional containing the ScoringLadder, or empty if not applicable
-     */
-    public Optional<ScoringLadder> asScoringLadder() {
-        return ladder instanceof ScoringLadder s ? Optional.of(s) : Optional.empty();
-    }
-
-    /**
      * Handles player death using the ladder's respawn mechanics.
      * Returns the death result which indicates how the death should be processed.
      *
@@ -295,19 +411,6 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
             return respawnableLadder.handlePlayerDeath(player, this, getCurrentRound());
         }
         return DeathResult.ELIMINATED;
-    }
-
-    /**
-     * Checks if the round should end based on ladder-specific scoring.
-     *
-     * @param triggerPlayer The player who triggered the scoring check
-     * @return true if the round should end based on scoring conditions
-     */
-    public boolean shouldEndRoundByScoring(Player triggerPlayer) {
-        if (ladder instanceof ScoringLadder scoringLadder) {
-            return scoringLadder.shouldEndRound(this, getCurrentRound(), triggerPlayer);
-        }
-        return false;
     }
 
     /*
@@ -391,16 +494,28 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
         }
     }
 
+    @Override
+    public List<Player> getActivePlayerList() {
+        return this.players;
+    }
+
+    @Override
+    public boolean isBuild() {
+        return ladder.isBuild();
+    }
+
+    @Override
     public void addBlockChange(ChangedBlock changedBlock) {
         fightChange.addBlockChange(changedBlock);
     }
 
+    @Override
     public void addEntityChange(Entity entity) {
         fightChange.addEntityChange(entity);
 
         if (!ladder.isBuild()) {
             for (Player player : MatchManager.getInstance().getHidePlayers(this)) {
-                ClassImport.getClasses().getEntityHider().hideEntity(player, entity);
+                ZonePractice.getEntityHider().hideEntity(player, entity);
             }
         }
     }
@@ -410,17 +525,80 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
             addEntityChange(entity);
     }
 
-    public void resetMap() {
+    /**
+     * Rolls back the arena and, once every block is restored, fires {@code afterRollback}
+     * on the main thread (e.g. to start the next round).
+     * <p>
+     * While rolling back:
+     * <ul>
+     *   <li>Every player is teleported to their spawn position and frozen there.</li>
+     *   <li>A "rolling back arena" message is sent to all participants.</li>
+     * </ul>
+     *
+     * @param afterRollback called when rollback is complete, or {@code null} to do nothing
+     */
+    public void resetMap(@org.jetbrains.annotations.Nullable Runnable afterRollback) {
         // Make sure that the players can safely spawn back to the starting position.
         for (Location location : this.arena.getStandingLocations()) {
             MatchUtil.safePlayerTeleportBlock(location.getBlock().getRelative(BlockFace.DOWN));
         }
 
+        // Teleport every player to their spawn position and freeze them there
+        // so they cannot walk around in the arena while it is being regenerated.
+        rollingBack = true;
+        for (Player player : this.players) {
+            teleportPlayer(player);
+        }
+
+        if (this.isBuild()) {
+             // Inform everyone that they must wait for the arena to regenerate.
+            sendMessage(LanguageManager.getString("MATCH.ARENA-ROLLING-BACK"), true);
+        }
+
+        Runnable onRollbackComplete = () -> {
+            if (this.isBuild()) {
+                this.teleportStuckSpectatorsAfterRollback();
+            }
+
+            rollingBack = false;
+            if (afterRollback != null) {
+                afterRollback.run();
+            }
+        };
+
         if (ZonePractice.getInstance().isEnabled()) {
             Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () ->
-                    fightChange.rollback(300, 100), 2L);
+                    fightChange.rollback(300, 100, onRollbackComplete), 2L);
         } else {
-            fightChange.rollback(300, 100);
+            fightChange.rollback(300, 100, onRollbackComplete);
+        }
+    }
+
+    private void teleportStuckSpectatorsAfterRollback() {
+        if (this.spectators.isEmpty()) {
+            return;
+        }
+
+        for (Player spectator : new ArrayList<>(this.spectators)) {
+            if (spectator == null || !spectator.isOnline()) {
+                continue;
+            }
+
+            if (!dev.nandi0813.practice.manager.fight.util.PlayerUtil.isPlayerStuck(spectator)) {
+                continue;
+            }
+
+            if (!this.players.isEmpty()) {
+                spectator.teleport(this.players.get(random.nextInt(this.players.size())));
+                continue;
+            }
+
+            List<Location> standingLocations = this.arena.getStandingLocations();
+            if (!standingLocations.isEmpty()) {
+                spectator.teleport(standingLocations.get(random.nextInt(standingLocations.size())));
+            } else {
+                spectator.teleport(this.arena.getCuboid().getCenter().add(0, 1, 0));
+            }
         }
     }
 
@@ -474,7 +652,7 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
     public GUIItem getSpectatorMenuItem() {
         return GUIFile.getGuiItem("GUIS.SPECTATOR-MENU.ICONS.MATCH-ICON")
                 .setMaterial(ladder.getIcon().getType())
-                .setDamage(ladder.getIcon().getDurability())
+                .setDamage(Common.getItemDamage(ladder.getIcon()))
                 .replace("%match_id%", id)
                 .replace("%weight_class%", ((this instanceof Duel && ((Duel) this).isRanked()) ? WeightClass.RANKED.getName() : WeightClass.UNRANKED.getName()))
                 .replace("%match_type%", type.getName(false))
@@ -494,7 +672,7 @@ public abstract class Match extends BukkitRunnable implements Spectatable, dev.n
 
     @Override
     public Cuboid getCuboid() {
-        return arena.getCuboid();
+        return arena != null ? arena.getCuboid() : null;
     }
 
 }

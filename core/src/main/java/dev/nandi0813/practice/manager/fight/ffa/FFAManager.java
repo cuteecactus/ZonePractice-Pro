@@ -3,6 +3,8 @@ package dev.nandi0813.practice.manager.fight.ffa;
 import dev.nandi0813.practice.manager.arena.ArenaManager;
 import dev.nandi0813.practice.manager.arena.arenas.FFAArena;
 import dev.nandi0813.practice.manager.fight.ffa.game.FFA;
+import dev.nandi0813.practice.manager.fight.ffa.game.FFAArenaSelectorGui;
+import dev.nandi0813.practice.manager.gui.GUIManager;
 import dev.nandi0813.practice.manager.spectator.SpectatorManager;
 import dev.nandi0813.practice.util.interfaces.Spectatable;
 import lombok.Getter;
@@ -23,7 +25,11 @@ public class FFAManager {
         return instance;
     }
 
+    private final FFAArenaSelectorGui arenaSelectorGui;
+
     private FFAManager() {
+        this.arenaSelectorGui = new FFAArenaSelectorGui();
+        GUIManager.getInstance().addGUI(this.arenaSelectorGui);
     }
 
     public List<FFA> getOpenFFAs() {
@@ -40,9 +46,19 @@ public class FFAManager {
     }
 
     public FFA getFFAByPlayer(Player player) {
-        for (FFAArena ffaArena : ArenaManager.getInstance().getFFAArenas())
-            if (ffaArena.getFfa().getPlayers().containsKey(player))
-                return ffaArena.getFfa();
+        for (FFAArena ffaArena : ArenaManager.getInstance().getFFAArenas()) {
+            FFA ffa = ffaArena.getFfa();
+            if (ffa.getPlayers().containsKey(player)) {
+                return ffa;
+            }
+
+            // Fallback for stale Player-object map keys.
+            for (Player ffaPlayer : ffa.getPlayers().keySet()) {
+                if (player.getUniqueId().equals(ffaPlayer.getUniqueId())) {
+                    return ffa;
+                }
+            }
+        }
         return null;
     }
 

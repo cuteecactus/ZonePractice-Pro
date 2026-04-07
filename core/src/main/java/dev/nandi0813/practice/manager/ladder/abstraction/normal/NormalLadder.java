@@ -14,10 +14,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Getter
 public abstract class NormalLadder extends Ladder {
@@ -39,6 +36,15 @@ public abstract class NormalLadder extends Ladder {
     // Preview gui
     @Setter
     protected LadderPreviewGui previewGui;
+
+    /**
+     * Names of arenas this ladder was assigned to at the time it was disabled.
+     * Populated by {@link dev.nandi0813.practice.manager.arena.ArenaManager#removeLadder}
+     * and consumed (then cleared) by
+     * {@link dev.nandi0813.practice.manager.ladder.util.LadderUtil#enableLadder} so the
+     * assignments are automatically restored when the ladder is re-enabled.
+     */
+    protected final Set<String> previouslyAssignedArenas = new HashSet<>();
 
     protected NormalLadder(String name, LadderType type) {
         super(name, type);
@@ -65,7 +71,7 @@ public abstract class NormalLadder extends Ladder {
     }
 
     public boolean isReadyToEnable() {
-        return icon != null && kitData.isSet() && !matchTypes.isEmpty();
+        return icon != null && kitData.isSet();
     }
 
     public void setFrozen(boolean frozen) {
@@ -73,10 +79,10 @@ public abstract class NormalLadder extends Ladder {
 
         GUIManager.getInstance().searchGUI(GUIType.Ladder_Summary).update();
         LadderSetupManager.getInstance().getLadderSetupGUIs().get(this).get(GUIType.Ladder_Main).update();
-        GUIManager.getInstance().searchGUI(GUIType.Queue_Unranked).update();
+        GUIManager.getInstance().searchGUI(GUIType.Queue_Unranked).update(true);
 
         if (this.isRanked())
-            GUIManager.getInstance().searchGUI(GUIType.Queue_Ranked).update();
+            GUIManager.getInstance().searchGUI(GUIType.Queue_Ranked).update(true);
     }
 
     public boolean isUnranked() {

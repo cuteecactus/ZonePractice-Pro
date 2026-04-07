@@ -4,6 +4,7 @@ import dev.nandi0813.practice.manager.arena.ArenaManager;
 import dev.nandi0813.practice.manager.arena.ArenaType;
 import dev.nandi0813.practice.manager.arena.arenas.interfaces.DisplayArena;
 import dev.nandi0813.practice.manager.arena.util.ArenaUtil;
+import dev.nandi0813.practice.manager.backend.ConfigManager;
 import dev.nandi0813.practice.manager.fight.ffa.game.FFA;
 import dev.nandi0813.practice.manager.gui.GUI;
 import dev.nandi0813.practice.manager.gui.GUIType;
@@ -14,16 +15,21 @@ import dev.nandi0813.practice.manager.ladder.enums.LadderType;
 import lombok.Getter;
 import org.bukkit.configuration.file.YamlConfiguration;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Getter
 public class FFAArena extends DisplayArena {
 
+    private static final boolean DEFAULT_HEALTH_RESET_ON_KILL = ConfigManager.getBoolean("FFA.HEALTH-RESET-ON-KILL");
+    private static final boolean DEFAULT_HEALTH_BELOW_NAME = ConfigManager.getBoolean("FFA.HEALTH-BELOW-NAME");
+
     private final FFA ffa;
     private boolean reKitAfterKill;
     private boolean lobbyAfterDeath;
+    private boolean healthResetOnKill;
+    private boolean healthBelowName;
 
     public FFAArena(String name) {
         super(name, ArenaType.FFA);
@@ -33,6 +39,8 @@ public class FFAArena extends DisplayArena {
         this.portalLoc1 = null;
         this.portalLoc2 = null;
         this.portalProtection = false;
+        this.healthResetOnKill = DEFAULT_HEALTH_RESET_ON_KILL;
+        this.healthBelowName = DEFAULT_HEALTH_BELOW_NAME;
 
         this.getData();
 
@@ -54,6 +62,8 @@ public class FFAArena extends DisplayArena {
         config.set("build", this.build);
         config.set("reKitAfterKill", this.reKitAfterKill);
         config.set("lobbyAfterDeath", this.lobbyAfterDeath);
+        config.set("healthResetOnKill", this.healthResetOnKill);
+        config.set("healthBelowName", this.healthBelowName);
 
         config.set("ladders", ArenaUtil.getLadderNames(this));
 
@@ -77,6 +87,12 @@ public class FFAArena extends DisplayArena {
 
         if (config.isBoolean("lobbyAfterDeath"))
             this.setLobbyAfterDeath(config.getBoolean("lobbyAfterDeath"));
+
+        if (config.isBoolean("healthResetOnKill"))
+            this.setHealthResetOnKill(config.getBoolean("healthResetOnKill"));
+
+        if (config.isBoolean("healthBelowName"))
+            this.setHealthBelowName(config.getBoolean("healthBelowName"));
 
         if (config.isList("ladders")) {
             for (String ladderName : config.getStringList("ladders")) {
@@ -102,8 +118,8 @@ public class FFAArena extends DisplayArena {
     }
 
     @Override
-    public List<NormalLadder> getAssignableLadders() {
-        List<NormalLadder> list = new ArrayList<>();
+    public Set<NormalLadder> getAssignableLadders() {
+        Set<NormalLadder> list = new HashSet<>();
 
         for (NormalLadder ladder : LadderManager.getInstance().getLadders()) {
             if (this.build && ladder.getType().equals(LadderType.BUILD) && ladder.getLadderKnockback().isDefault())
@@ -137,6 +153,22 @@ public class FFAArena extends DisplayArena {
         this.lobbyAfterDeath = lobbyAfterDeath;
     }
 
+    public void setHealthResetOnKill(boolean healthResetOnKill) throws IllegalStateException {
+        if (this.enabled) {
+            throw new IllegalStateException("Cannot edit while arena is enabled.");
+        }
+
+        this.healthResetOnKill = healthResetOnKill;
+    }
+
+    public void setHealthBelowName(boolean healthBelowName) throws IllegalStateException {
+        if (this.enabled) {
+            throw new IllegalStateException("Cannot edit while arena is enabled.");
+        }
+
+        this.healthBelowName = healthBelowName;
+    }
+
     public void setBuild(boolean build) {
         if (this.enabled) {
             throw new IllegalStateException("Cannot edit while arena is enabled.");
@@ -144,7 +176,7 @@ public class FFAArena extends DisplayArena {
 
         this.build = build;
 
-        List<NormalLadder> assignableLadders = this.getAssignableLadders();
+        Set<NormalLadder> assignableLadders = this.getAssignableLadders();
         this.assignedLadders.removeIf(ladder -> !assignableLadders.contains(ladder));
 
         GUI ladderGUI = ArenaGUISetupManager.getInstance().getArenaSetupGUIs().getOrDefault(this, new HashMap<>()).get(GUIType.Arena_Ladders_Single);

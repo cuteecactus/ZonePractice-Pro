@@ -1,10 +1,10 @@
 package dev.nandi0813.practice.manager.ladder.abstraction.interfaces;
 
-import dev.nandi0813.practice.ZonePractice;
+import dev.nandi0813.practice.manager.arena.util.ArenaUtil;
 import dev.nandi0813.practice.manager.fight.match.Match;
 import dev.nandi0813.practice.manager.fight.util.BlockUtil;
+import dev.nandi0813.practice.manager.fight.util.ChangedBlock;
 import dev.nandi0813.practice.manager.fight.util.ListenerUtil;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.fightmapchange.BlockPosition;
 import dev.nandi0813.practice.util.fightmapchange.FightChangeOptimized;
 import org.bukkit.Location;
@@ -14,17 +14,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
-import org.bukkit.metadata.FixedMetadataValue;
-import org.bukkit.metadata.MetadataValue;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import static dev.nandi0813.practice.util.PermanentConfig.PLACED_IN_FIGHT;
 
 public interface TempBuild {
 
-    void setBuildDelay(int buildDelay);
-
-    int getBuildDelay();
+    String TEMP_BUILD_BLOCK_ITEM = "ZONEPRACTICE_PRO_TEMP_BUILD_BLOCK_ITEM";
 
     static void onBucketEmpty(final @NotNull PlayerBucketEmptyEvent e, final @NotNull Match match, final int buildDelay) {
         if (e.isCancelled()) return;
@@ -32,19 +29,19 @@ public interface TempBuild {
         Player player = e.getPlayer();
         Block block = e.getBlockClicked();
 
-        block.getRelative(e.getBlockFace()).setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), match));
+        BlockUtil.setMetadata(block.getRelative(e.getBlockFace()), PLACED_IN_FIGHT, match);
 
         for (BlockFace face : BlockFace.values()) {
             Block relative = block.getRelative(face, 1);
-            if (relative.hasMetadata(PLACED_IN_FIGHT)) {
-                MetadataValue mv = BlockUtil.getMetadata(relative, PLACED_IN_FIGHT);
+            if (BlockUtil.hasMetadata(relative, PLACED_IN_FIGHT)) {
+                Object mv = BlockUtil.getMetadata(relative, PLACED_IN_FIGHT, Object.class);
                 if (ListenerUtil.checkMetaData(mv) || relative.getType().isSolid()) continue;
 
-                match.getFightChange().addBlockChange(ClassImport.createChangeBlock(block), player, buildDelay);
+                match.getFightChange().addBlockChange(new ChangedBlock(block), player, buildDelay, e.getHand());
 
                 Block b2 = block.getLocation().subtract(0, 1, 0).getBlock();
-                if (ClassImport.getClasses().getArenaUtil().turnsToDirt(b2))
-                    match.getFightChange().addArenaBlockChange(ClassImport.createChangeBlock(b2));
+                if (ArenaUtil.turnsToDirt(b2))
+                    match.getFightChange().addArenaBlockChange(new ChangedBlock(b2));
             }
         }
     }
@@ -55,13 +52,14 @@ public interface TempBuild {
         Player player = e.getPlayer();
         Block block = e.getBlockPlaced();
 
-        block.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), match));
+        BlockUtil.setMetadata(block, PLACED_IN_FIGHT, match);
+        BlockUtil.setMetadata(block, TEMP_BUILD_BLOCK_ITEM, createPlacedReturnItem(e));
 
-        match.getFightChange().addBlockChange(ClassImport.createChangeBlock(e), player, buildDelay);
+        match.getFightChange().addBlockChange(new ChangedBlock(e), player, buildDelay, e.getHand());
 
         Block block2 = e.getBlockPlaced().getLocation().subtract(0, 1, 0).getBlock();
-        if (ClassImport.getClasses().getArenaUtil().turnsToDirt(block2))
-            match.getFightChange().addArenaBlockChange(ClassImport.createChangeBlock(block2));
+        if (ArenaUtil.turnsToDirt(block2))
+            match.getFightChange().addArenaBlockChange(new ChangedBlock(block2));
     }
 
     static void onBlockBreak(final @NotNull BlockBreakEvent e, final @NotNull Match match) {
@@ -71,9 +69,9 @@ public interface TempBuild {
         Location location = block.getLocation();
         FightChangeOptimized fightChange = match.getFightChange();
 
-        if (!block.hasMetadata(PLACED_IN_FIGHT)) return;
+        if (!BlockUtil.hasMetadata(block, PLACED_IN_FIGHT)) return;
 
-        MetadataValue mv = BlockUtil.getMetadata(e.getBlock(), PLACED_IN_FIGHT);
+        Object mv = BlockUtil.getMetadata(e.getBlock(), PLACED_IN_FIGHT, Object.class);
         if (ListenerUtil.checkMetaData(mv)) {
             e.setCancelled(true);
             return;
@@ -90,6 +88,17 @@ public interface TempBuild {
                 tempData.reset(fightChange, entry.getChangedBlock(), pos);
             }
         }
+    }
+
+    private static @NotNull ItemStack createPlacedReturnItem(final @NotNull BlockPlaceEvent e) {
+        ItemStack placedItem = e.getItemInHand();
+        if (placedItem.getType().isAir()) {
+            return new ItemStack(e.getBlockPlaced().getType(), 1);
+        }
+
+        ItemStack clone = placedItem.clone();
+        clone.setAmount(1);
+        return clone;
     }
 
 }

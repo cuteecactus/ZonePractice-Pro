@@ -2,47 +2,47 @@ package dev.nandi0813.practice.manager.fight.ffa;
 
 import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.arena.arenas.FFAArena;
+import dev.nandi0813.practice.manager.arena.util.ArenaUtil;
 import dev.nandi0813.practice.manager.backend.ConfigManager;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.fight.ffa.game.FFA;
-import dev.nandi0813.practice.manager.fight.util.BlockUtil;
-import dev.nandi0813.practice.manager.fight.util.DeathCause;
-import dev.nandi0813.practice.manager.fight.util.ListenerUtil;
-import dev.nandi0813.practice.manager.ladder.abstraction.Ladder;
+import dev.nandi0813.practice.manager.fight.util.*;
+import dev.nandi0813.practice.manager.fight.util.Stats.Statistic;
 import dev.nandi0813.practice.manager.ladder.abstraction.normal.NormalLadder;
-import dev.nandi0813.practice.module.util.ClassImport;
+import dev.nandi0813.practice.manager.profile.Profile;
+import dev.nandi0813.practice.manager.profile.ProfileManager;
+import dev.nandi0813.practice.manager.spectator.SpectatorCrystalPlacementUtil;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.Cuboid;
 import dev.nandi0813.practice.util.NumberUtil;
-import dev.nandi0813.practice.util.StringUtil;
-import dev.nandi0813.practice.util.cooldown.CooldownObject;
-import dev.nandi0813.practice.util.cooldown.GoldenAppleRunnable;
-import dev.nandi0813.practice.util.cooldown.PlayerCooldown;
 import dev.nandi0813.practice.util.fightmapchange.FightChangeOptimized;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
-import org.bukkit.entity.Player;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.*;
-import org.bukkit.event.entity.EntityExplodeEvent;
-import org.bukkit.event.entity.EntityRegainHealthEvent;
-import org.bukkit.event.entity.FoodLevelChangeEvent;
-import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.player.*;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.metadata.FixedMetadataValue;
-import org.bukkit.metadata.MetadataValue;
 
-import java.util.List;
-import java.util.Objects;
-
+import static dev.nandi0813.practice.util.PermanentConfig.FIGHT_ENTITY;
 import static dev.nandi0813.practice.util.PermanentConfig.PLACED_IN_FIGHT;
 
-public abstract class FFAListener implements Listener {
+/**
+ * FFA-specific event listener.
+ *
+ * <p>Block tracking / rollback events (break, place, piston, liquid, explosion, etc.)
+ * are handled by the unified {@link dev.nandi0813.practice.manager.fight.listener.BuildListener}.
+ * This listener only handles player-specific FFA game logic (damage, movement, crafting, etc.)
+ * and the build validation gates (cancel the event before MONITOR fires for BuildListener).</p>
+ */
+public class FFAListener implements Listener {
 
     @EventHandler
     public void onRegen(EntityRegainHealthEvent e) {
@@ -71,6 +71,7 @@ public abstract class FFAListener implements Listener {
     }
 
     private static final boolean ENABLE_TNT = ConfigManager.getBoolean("FFA.ENABLE_TNT");
+
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent e) {
         Player player = e.getPlayer();
@@ -78,10 +79,22 @@ public abstract class FFAListener implements Listener {
 
         FFA ffa = FFAManager.getInstance().getFFAByPlayer(player);
         if (ffa == null) return;
+        
+        // Prevent interaction while waiting for kit selection
+        if (ffa.isPlayerWaitingForKitSelection(player)) {
+            ffa.playerSelectKit(player, player.getInventory().getHeldItemSlot());
+            e.setCancelled(true);
+            return;
+        }
+        
         if (!action.equals(Action.RIGHT_CLICK_AIR) && !action.equals(Action.RIGHT_CLICK_BLOCK)) return;
 
         Block clickedBlock = e.getClickedBlock();
         if (action.equals(Action.RIGHT_CLICK_BLOCK) && clickedBlock != null) {
+            if (ffa.isBuild()) {
+                SpectatorCrystalPlacementUtil.clearSpectatorsBlockingCrystalPlacement(e, ffa.getArena().getCuboid());
+            }
+
             if (clickedBlock.getType().equals(Material.TNT)) {
                 if (!ffa.isBuild() || !ENABLE_TNT) {
                     e.setCancelled(true);
@@ -90,34 +103,27 @@ public abstract class FFAListener implements Listener {
             }
             if (clickedBlock.getType().equals(Material.CHEST) || clickedBlock.getType().equals(Material.TRAPPED_CHEST)) {
                 if (!ffa.isBuild()) return;
-                ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(clickedBlock));
+                ffa.getFightChange().addBlockChange(new ChangedBlock(clickedBlock));
             }
         }
     }
 
     @EventHandler
-    public void onGoldenHeadConsume(PlayerItemConsumeEvent e) {
-        Player player = e.getPlayer();
+    public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent e) {
+        if (!(e.getWhoClicked() instanceof Player player)) return;
 
         FFA ffa = FFAManager.getInstance().getFFAByPlayer(player);
         if (ffa == null) return;
 
-        ItemStack item = e.getItem();
-        if (item == null) return;
+        // Only handle clicks while waiting for kit selection
+        if (!ffa.isPlayerWaitingForKitSelection(player)) return;
 
-        if (!item.getType().equals(Material.GOLDEN_APPLE)) return;
+        e.setCancelled(true);
 
-        Ladder ladder = ffa.getPlayers().get(player);
-        if (ladder.getGoldenAppleCooldown() < 1) return;
-
-        if (!PlayerCooldown.isActive(player, CooldownObject.GOLDEN_APPLE)) {
-            GoldenAppleRunnable goldenAppleRunnable = new GoldenAppleRunnable(player, ladder.getGoldenAppleCooldown());
-            goldenAppleRunnable.begin();
-        } else {
-            e.setCancelled(true);
-
-            Common.sendMMMessage(player, StringUtil.replaceSecondString(LanguageManager.getString("FFA.GAME.COOLDOWN.GOLDEN-APPLE"), PlayerCooldown.getLeftInDouble(player, CooldownObject.GOLDEN_APPLE)));
-            player.updateInventory();
+        // Check if the clicked item is an enchanted book (kit selection)
+        if (e.getCurrentItem() != null && (e.getCurrentItem().getType() == Material.ENCHANTED_BOOK || e.getCurrentItem().getType() == Material.BOOK)) {
+            int slot = e.getSlot();
+            ffa.playerSelectKit(player, slot);
         }
     }
 
@@ -127,12 +133,31 @@ public abstract class FFAListener implements Listener {
 
         FFA ffa = FFAManager.getInstance().getFFAByPlayer(player);
         if (ffa == null) return;
-        if (!ffa.isBuild()) return;
 
-        FightChangeOptimized fightChange = ffa.getFightChange();
-        if (fightChange == null) return;
+        // Prevent projectile launch while waiting for kit selection
+        if (ffa.isPlayerWaitingForKitSelection(player)) {
+            e.setCancelled(true);
+            return;
+        }
 
-        fightChange.addEntityChange(e.getEntity());
+        if (ffa.isBuild()) {
+            // Build FFAs: track all projectiles for entity rollback cleanup
+            FightChangeOptimized fightChange = ffa.getFightChange();
+            if (fightChange != null) fightChange.addEntityChange(e.getEntity());
+        }
+
+        // For arrow-like projectiles (arrow/spectral/trident) in any FFA: tag with
+        // FIGHT_ENTITY so they are preserved and isolated per-arena.
+        if (e.getEntity() instanceof AbstractArrow projectile) {
+            BlockUtil.setMetadata(projectile, FIGHT_ENTITY, ffa);
+
+            // Hide from every online player NOT in this FFA
+            for (org.bukkit.entity.Player online : ZonePractice.getInstance().getServer().getOnlinePlayers()) {
+                if (!ffa.getPlayers().containsKey(online) && !ffa.getSpectators().contains(online)) {
+                    ZonePractice.getEntityHider().hideEntity(online, projectile);
+                }
+            }
+        }
     }
 
     @EventHandler
@@ -156,9 +181,10 @@ public abstract class FFAListener implements Listener {
 
     private static final boolean DISPLAY_ARROW_HIT = ConfigManager.getBoolean("FFA.DISPLAY-ARROW-HIT-HEALTH");
 
-    protected static void arrowDisplayHearth(Player shooter, Player target, double finalDamage) {
+    protected static void arrowDisplayHearth(Player shooter, Player target, double finalDamage, EntityDamageByEntityEvent event) {
         if (!DISPLAY_ARROW_HIT) return;
         if (shooter == null || target == null) return;
+        if (event.isCancelled()) return;
 
         FFA ffa = FFAManager.getInstance().getFFAByPlayer(shooter);
         if (ffa == null) return;
@@ -173,6 +199,10 @@ public abstract class FFAListener implements Listener {
 
     private static final boolean ALLOW_DESTROYABLE_BLOCK = ConfigManager.getBoolean("FFA.ALLOW-DESTROYABLE-BLOCK");
 
+    /**
+     * Validates FFA build rules (build enabled, build limits).
+     * Actual block tracking is done by {@link dev.nandi0813.practice.manager.fight.listener.BuildListener}.
+     */
     @EventHandler
     public void onBlockBreak(BlockBreakEvent e) {
         Player player = e.getPlayer();
@@ -187,21 +217,11 @@ public abstract class FFAListener implements Listener {
 
         Block block = e.getBlock();
 
-        // Allow breaking blocks generated by liquid interaction (generators) regardless of height
-        // These blocks have the PLACED_IN_FIGHT metadata from the BlockFormEvent
-        if (block.hasMetadata(PLACED_IN_FIGHT)) {
-            MetadataValue mv = BlockUtil.getMetadata(block, PLACED_IN_FIGHT);
+        // Blocks placed during the fight — allow breaking (tracking done by BuildListener)
+        if (BlockUtil.hasMetadata(block, PLACED_IN_FIGHT)) {
+            Object mv = BlockUtil.getMetadata(block, PLACED_IN_FIGHT, Object.class);
             if (ListenerUtil.checkMetaData(mv)) {
                 e.setCancelled(true);
-                return;
-            }
-
-            // Block was placed/formed during FFA, allow breaking
-            ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(block));
-
-            Block underBlock = block.getLocation().subtract(0, 1, 0).getBlock();
-            if (underBlock.getType() == Material.DIRT) {
-                ffa.getFightChange().addArenaBlockChange(ClassImport.createChangeBlock(underBlock));
             }
             return;
         }
@@ -209,7 +229,6 @@ public abstract class FFAListener implements Listener {
         // For natural arena blocks or destroyable blocks, check build limits
         if (e.getBlock().getLocation().getY() >= ListenerUtil.getCalculatedBuildLimit(ffa.getArena())) {
             Common.sendMMMessage(player, LanguageManager.getString("FFA.GAME.CANT-BUILD-OVER-LIMIT"));
-
             e.setCancelled(true);
             return;
         }
@@ -218,15 +237,27 @@ public abstract class FFAListener implements Listener {
         if (ALLOW_DESTROYABLE_BLOCK) {
             NormalLadder ladder = ffa.getPlayers().get(player);
             if (ladder != null) {
-                if (ClassImport.getClasses().getArenaUtil().containsDestroyableBlock(ladder, block)) {
+                if (ArenaUtil.containsDestroyableBlock(ladder, block)) {
                     BlockUtil.breakBlock(ffa, block);
                 }
             }
         }
 
+        // When break-all-blocks is enabled on the player's current ladder, track the
+        // natural arena block for rollback and allow the break.
+        NormalLadder currentLadder = ffa.getPlayers().get(player);
+        if (currentLadder != null && currentLadder.isBreakAllBlocks()) {
+            ffa.getFightChange().addArenaBlockChange(new ChangedBlock(block));
+            return; // do NOT cancel — let the break happen
+        }
+
         e.setCancelled(true);
     }
 
+    /**
+     * Validates FFA build rules (build enabled, arena boundary, build limits) and tags block.
+     * Actual tracking is done by {@link dev.nandi0813.practice.manager.fight.listener.BuildListener}.
+     */
     @EventHandler
     public void onBlockPlace(BlockPlaceEvent e) {
         Player player = e.getPlayer();
@@ -244,51 +275,21 @@ public abstract class FFAListener implements Listener {
 
         if (!arena.getCuboid().contains(block.getLocation())) {
             Common.sendMMMessage(player, LanguageManager.getString("FFA.GAME.CANT-BUILD-OUTSIDE-ARENA"));
-
             e.setCancelled(true);
             return;
         }
 
         if (block.getLocation().getY() >= ListenerUtil.getCalculatedBuildLimit(arena)) {
             Common.sendMMMessage(player, LanguageManager.getString("FFA.GAME.CANT-BUILD-OVER-LIMIT"));
-
             e.setCancelled(true);
-            return;
         }
-
-        if (!e.isCancelled()) {
-            block.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-            ffa.getFightChange().addBlockChange(Objects.requireNonNull(ClassImport.createChangeBlock(e)));
-
-            Block underBlock = e.getBlockPlaced().getLocation().subtract(0, 1, 0).getBlock();
-            if (ClassImport.getClasses().getArenaUtil().turnsToDirt(underBlock))
-                ffa.getFightChange().addArenaBlockChange(ClassImport.createChangeBlock(underBlock));
-        }
+        // Tagging and tracking handled by BuildListener at MONITOR priority
     }
 
-    @EventHandler
-    public void onLiquidFlow(BlockFromToEvent e) {
-        Block block = e.getBlock();
-
-        if (!block.hasMetadata(PLACED_IN_FIGHT)) return;
-        MetadataValue mv = BlockUtil.getMetadata(block, PLACED_IN_FIGHT);
-
-        if (ListenerUtil.checkMetaData(mv)) return;
-        if (!(mv.value() instanceof FFA ffa)) return;
-        if (!ffa.isBuild()) return;
-
-        Block toBlock = e.getToBlock();
-        if (!toBlock.getType().isSolid()) {
-            toBlock.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-            ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(toBlock));
-
-            Block underBlock = toBlock.getLocation().subtract(0, 1, 0).getBlock();
-            if (ClassImport.getClasses().getArenaUtil().turnsToDirt(underBlock)) {
-                ffa.getFightChange().addArenaBlockChange(ClassImport.createChangeBlock(underBlock));
-            }
-        }
-    }
-
+    /**
+     * Validates FFA bucket rules and tags the target block.
+     * Actual tracking is done by {@link dev.nandi0813.practice.manager.fight.listener.BuildListener}.
+     */
     @EventHandler
     public void onBucketEmpty(PlayerBucketEmptyEvent e) {
         Player player = e.getPlayer();
@@ -304,34 +305,15 @@ public abstract class FFAListener implements Listener {
         Block block = e.getBlockClicked();
         if (!ffa.getArena().getCuboid().contains(block.getLocation())) {
             Common.sendMMMessage(player, LanguageManager.getString("FFA.GAME.CANT-BUILD-OUTSIDE-ARENA"));
-
             e.setCancelled(true);
             return;
         }
 
-        if (block.getLocation().getY() >= ListenerUtil.getCalculatedBuildLimit(ffa.getArena())) {
+        if (block.getRelative(e.getBlockFace()).getLocation().getY() >= ListenerUtil.getCalculatedBuildLimit(ffa.getArena())) {
             Common.sendMMMessage(player, LanguageManager.getString("FFA.GAME.CANT-BUILD-OVER-LIMIT"));
-
             e.setCancelled(true);
-            return;
         }
-
-        block.getRelative(e.getBlockFace()).setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-
-        for (BlockFace face : BlockFace.values()) {
-            Block relative = block.getRelative(face, 1);
-            if (relative.hasMetadata(PLACED_IN_FIGHT)) {
-                MetadataValue mv = BlockUtil.getMetadata(relative, PLACED_IN_FIGHT);
-                if (ListenerUtil.checkMetaData(mv) || relative.getType().isSolid()) continue;
-
-                relative.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-                ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(relative));
-
-                Block underBlock = relative.getLocation().subtract(0, 1, 0).getBlock();
-                if (ClassImport.getClasses().getArenaUtil().turnsToDirt(underBlock))
-                    ffa.getFightChange().addArenaBlockChange(ClassImport.createChangeBlock(underBlock));
-            }
-        }
+        // Liquid source block captured for rollback at MONITOR priority by AbstractBuildListener.onBucketEmpty
     }
 
     @EventHandler
@@ -371,151 +353,134 @@ public abstract class FFAListener implements Listener {
     }
 
     @EventHandler
-    public void onItemPickup(PlayerPickupItemEvent e) {
-        Player player = e.getPlayer();
+    public void onItemPickup(EntityPickupItemEvent e) {
+        if (!(e.getEntity() instanceof Player player)) return;
+
         FFA ffa = FFAManager.getInstance().getFFAByPlayer(player);
         if (ffa == null) return;
+
+        // Prevent picking up items (e.g. arrows) that have been hidden from this player
+        if (!ZonePractice.getEntityHider().canSee(player, e.getItem())) {
+            e.setCancelled(true);
+            return;
+        }
 
         e.setCancelled(false);
     }
 
-    private void handleExplosion(List<Block> blockList, FFA ffa) {
-        if (ffa == null) {
+    @EventHandler
+    public void onPlayerDeath(PlayerDeathEvent e) {
+        Player player = e.getPlayer();
+
+        Profile profile = ProfileManager.getInstance().getProfile(player);
+        if (profile == null) return;
+
+        FFA ffa = FFAManager.getInstance().getFFAByPlayer(player);
+        if (ffa == null) return;
+
+        e.setCancelled(true);
+
+        DamageSource damageSource = e.getDamageSource();
+
+        // Void deaths are already handled by onPlayerMove in the core FFAListener.
+        // Skip here to avoid sending the death message twice.
+        if (damageSource.getDamageType().equals(DamageType.OUT_OF_WORLD)) {
             return;
         }
 
-        if (!ffa.isBuild()) {
-            return;
-        }
+        Player killer = resolveKiller(player, ffa, damageSource);
 
-        blockList.removeIf(
-                block -> !block.getType().equals(Material.TNT) &&
-                        !block.hasMetadata(PLACED_IN_FIGHT)
-        );
+        DeathCause cause = FightUtil.convert(damageSource.getDamageType());
+        ffa.killPlayer(player, killer, cause.getMessage().replace("%killer%", killer != null ? killer.getName() : "Unknown"));
 
-        for (Block block : blockList) {
-            ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(block));
+        if (killer != null) {
+            Statistic statistic = ffa.getStatistics().get(killer);
+            statistic.setKills(statistic.getKills() + 1);
         }
     }
 
-    @EventHandler
-    public void onEntityExplode(EntityExplodeEvent e) {
-        FFA ffa = FFAManager.getInstance().getOpenFFAs().stream()
-                .filter(m -> m.getCuboid().contains(e.getLocation()))
-                .findFirst()
-                .orElse(null);
+    private Player resolveKiller(Player victim, FFA ffa, DamageSource damageSource) {
+        Player killer = null;
 
-        if (ffa != null && !ffa.isBuild()) {
+        if (damageSource.getCausingEntity() instanceof Entity damageEntity) {
+            killer = FightUtil.getKiller(damageEntity);
+        }
+
+        // Bukkit keeps killer attribution for recent direct/projectile PvP.
+        if (killer == null) {
+            killer = victim.getKiller();
+        }
+
+        // Fallback for delayed environmental deaths (e.g. fatal fall after knockback).
+        if (killer == null) {
+            killer = ffa.getLastAttacker(victim);
+        }
+
+        if (killer != null && !ffa.getPlayers().containsKey(killer)) {
+            return null;
+        }
+
+        return killer;
+    }
+
+    @EventHandler
+    public void onEntityDamageByEntity(EntityDamageByEntityEvent e) {
+        if (!(e.getEntity() instanceof Player target)) {
+            return;
+        }
+
+        Profile profile = ProfileManager.getInstance().getProfile(target);
+        if (profile == null) return;
+
+        FFA ffa = FFAManager.getInstance().getFFAByPlayer(target);
+        if (ffa == null) return;
+
+        // Prevent damage to players waiting for kit selection
+        if (ffa.isPlayerWaitingForKitSelection(target)) {
             e.setCancelled(true);
             return;
         }
 
-        handleExplosion(e.blockList(), ffa);
+        // ...existing code...
+        Player attacker = null;
+        if (e.getDamager() instanceof Player damager) {
+            attacker = damager;
+
+            if (ffa.isPlayerWaitingForKitSelection(damager)) {
+                e.setCancelled(true);
+                return;
+            }
+        } else if (e.getDamager() instanceof Projectile projectile) {
+            if (projectile.getShooter() instanceof Player shooter) {
+                attacker = shooter;
+
+                if (projectile instanceof Arrow) {
+                    arrowDisplayHearth(shooter, target, e.getFinalDamage(), e);
+                }
+            }
+        }
+
+        // Record the attacker for void-kill attribution
+        if (attacker != null) {
+            ffa.recordAttack(target, attacker);
+        }
     }
 
     @EventHandler
-    public void onBlockExplode(BlockExplodeEvent e) {
-        FFA ffa = FFAManager.getInstance().getOpenFFAs().stream()
-                .filter(m -> m.getCuboid().contains(e.getBlock().getLocation()))
-                .findFirst()
-                .orElse(null);
-
-        if (ffa != null && !ffa.isBuild()) {
-            e.setCancelled(true);
+    public void onEntityDamage(EntityDamageEvent e) {
+        if (!(e.getEntity() instanceof Player target)) {
             return;
         }
 
-        handleExplosion(e.blockList(), ffa);
-    }
+        Profile profile = ProfileManager.getInstance().getProfile(target);
+        if (profile == null) return;
 
-    @EventHandler
-    public void onBlockPistonExtend(BlockPistonExtendEvent e) {
-        FFA ffa = FFAManager.getInstance().getOpenFFAs().stream()
-                .filter(m -> m.getCuboid().contains(e.getBlock().getLocation()))
-                .findFirst()
-                .orElse(null);
-
+        FFA ffa = FFAManager.getInstance().getFFAByPlayer(target);
         if (ffa == null) return;
 
-        if (!ffa.isBuild()) {
+        if (ffa.isPlayerWaitingForKitSelection(target)) {
             e.setCancelled(true);
-            return;
-        }
-
-        // Track all blocks being pushed
-        for (Block block : e.getBlocks()) {
-            block.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-            ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(block));
-
-            // Track the destination block
-            Block destination = block.getRelative(e.getDirection());
-            destination.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-            ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(destination));
         }
     }
-
-    @EventHandler
-    public void onBlockPistonRetract(BlockPistonRetractEvent e) {
-        FFA ffa = FFAManager.getInstance().getOpenFFAs().stream()
-                .filter(m -> m.getCuboid().contains(e.getBlock().getLocation()))
-                .findFirst()
-                .orElse(null);
-
-        if (ffa == null) return;
-
-        if (!ffa.isBuild()) {
-            e.setCancelled(true);
-            return;
-        }
-
-        // Track all blocks being pulled
-        for (Block block : e.getBlocks()) {
-            block.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-            ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(block));
-
-            // Track the destination block
-            Block destination = block.getRelative(e.getDirection());
-            destination.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-            ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(destination));
-        }
-    }
-
-    @EventHandler
-    public void onBlockForm(BlockFormEvent e) {
-        Block block = e.getBlock();
-
-        FFA ffa = FFAManager.getInstance().getOpenFFAs().stream()
-                .filter(m -> m.getCuboid().contains(block.getLocation()))
-                .findFirst()
-                .orElse(null);
-
-        if (ffa == null) return;
-        if (!ffa.isBuild()) return;
-
-        // Track cobblestone/obsidian/ice formation from water/lava
-        block.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-        ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(block));
-    }
-
-    @EventHandler
-    public void onBlockSpread(BlockSpreadEvent e) {
-        Block block = e.getBlock();
-
-        FFA ffa = FFAManager.getInstance().getOpenFFAs().stream()
-                .filter(m -> m.getCuboid().contains(block.getLocation()))
-                .findFirst()
-                .orElse(null);
-
-        if (ffa == null) return;
-        if (!ffa.isBuild()) return;
-
-        // Track spread blocks (fire, etc.)
-        Block source = e.getSource();
-        if (source.hasMetadata(PLACED_IN_FIGHT)) {
-            block.setMetadata(PLACED_IN_FIGHT, new FixedMetadataValue(ZonePractice.getInstance(), ffa));
-            ffa.getFightChange().addBlockChange(ClassImport.createChangeBlock(block));
-        }
-    }
-
 
 }

@@ -1,16 +1,18 @@
 package dev.nandi0813.practice.manager.fight.event.setup;
 
 import dev.nandi0813.api.Event.Event.EventEndEvent;
+import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.arena.util.ArenaWorldUtil;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.fight.event.interfaces.EventData;
+import dev.nandi0813.practice.manager.gui.GUIManager;
 import dev.nandi0813.practice.manager.gui.GUIType;
 import dev.nandi0813.practice.manager.gui.setup.event.EventSetupManager;
 import dev.nandi0813.practice.util.Common;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Mannequin;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -18,14 +20,23 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.*;
+import org.bukkit.inventory.EquipmentSlot;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 
 public class EventSetupListener implements Listener {
 
     private final EventWandSetupManager setupManager;
+
+    /**
+     * Paper 1.9+ fires {@link PlayerInteractEvent} twice per physical click – once for
+     * the main hand and once for the off hand.  We track which players have already been
+     * processed this tick and skip any duplicate invocation within the same tick.
+     */
+    private final Set<UUID> interactCooldown = new HashSet<>();
+    private final Set<UUID> entityInteractCooldown = new HashSet<>();
+    private final Set<UUID> markerDamageCooldown = new HashSet<>();
 
     public EventSetupListener(EventWandSetupManager setupManager) {
         this.setupManager = setupManager;
@@ -33,6 +44,10 @@ public class EventSetupListener implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+
         Player player = event.getPlayer();
 
         if (!setupManager.isSettingUp(player) || !setupManager.isSetupWand(event.getItem())) {
@@ -40,6 +55,17 @@ public class EventSetupListener implements Listener {
         }
 
         event.setCancelled(true);
+
+        // Paper fires PlayerInteractEvent twice per click (main hand + off hand).
+        // The first call adds the UUID; the second call finds it already present and bails out.
+        // The UUID is removed at the end of the same tick so the next click is processed normally.
+        if (!interactCooldown.add(player.getUniqueId())) {
+            return;
+        }
+        org.bukkit.Bukkit.getScheduler().runTask(
+                dev.nandi0813.practice.ZonePractice.getInstance(),
+                () -> interactCooldown.remove(player.getUniqueId())
+        );
 
         EventWandSetupManager.SetupSession session = setupManager.getSession(player);
         EventData eventData = session.getEventData();
@@ -53,7 +79,7 @@ public class EventSetupListener implements Listener {
         Action action = event.getAction();
 
         if (player.isSneaking()) {
-            handleModeSwitch(player, session, eventData, action);
+            handleModeSwitch(player, session, action);
             return;
         }
 
@@ -98,66 +124,106 @@ public class EventSetupListener implements Listener {
     }
 
     @EventHandler
-    public void onPlayerInteractAtEntity(PlayerInteractAtEntityEvent event) {
-        Player player = event.getPlayer();
-
-        if (!setupManager.isSettingUp(player) || !setupManager.isSetupWand(player.getItemInHand())) {
+    public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
 
+        Player player = event.getPlayer();
+        if (!setupManager.isSettingUp(player) || !setupManager.isSetupWand(player.getInventory().getItemInMainHand())) {
+            return;
+        }
+
+        if (event.getRightClicked() instanceof Mannequin mannequin && EventSpawnMarkerManager.getInstance().isMarker(mannequin)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onPlayerInteractAtEntity(PlayerInteractAtEntityEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+
+        Player player = event.getPlayer();
+
+        if (!setupManager.isSettingUp(player) || !setupManager.isSetupWand(player.getInventory().getItemInMainHand())) {
+            return;
+        }
+
+        if (!entityInteractCooldown.add(player.getUniqueId())) {
+            return;
+        }
+        org.bukkit.Bukkit.getScheduler().runTask(
+                ZonePractice.getInstance(),
+                () -> entityInteractCooldown.remove(player.getUniqueId())
+        );
+
         EventWandSetupManager.SetupSession session = setupManager.getSession(player);
+        if (session == null) {
+            return;
+        }
+
         if (session.getCurrentMode() != EventSetupMode.SPAWN_POINTS) {
             return;
         }
 
-        if (!(event.getRightClicked() instanceof ArmorStand armorStand)) {
+        if (!(event.getRightClicked() instanceof Mannequin mannequin)) {
             return;
         }
 
         event.setCancelled(true);
 
         EventData eventData = session.getEventData();
-        EventSpawnMarkerManager markerManager = EventSpawnMarkerManager.getInstance();
-
-        if (!markerManager.isMarker(armorStand)) {
+        if (eventData == null) {
             return;
         }
 
-        int spawnIndex = markerManager.getSpawnIndex(armorStand, eventData);
-        if (spawnIndex == -1) {
-            player.sendMessage(Common.colorize("&cCouldn't find spawn point for this marker."));
+        EventSpawnMarkerManager markerManager = EventSpawnMarkerManager.getInstance();
+
+        if (!markerManager.isMarker(mannequin)) {
+            return;
+        }
+
+        if (!markerManager.isSpawnMarker(mannequin)) {
+            return;
+        }
+
+        int spawnIndex = markerManager.getSpawnIndex(mannequin);
+        if (spawnIndex < 0 || spawnIndex >= eventData.getSpawns().size()) {
+            markerManager.updateMarkers(eventData);
+            updateGui(eventData);
+            player.sendMessage(Common.colorize("&cThis spawn marker is outdated. Markers have been refreshed."));
             return;
         }
 
         eventData.getSpawns().remove(spawnIndex);
         markerManager.updateMarkers(eventData);
         updateGui(eventData);
+        scheduleSave(eventData);
 
         player.sendMessage(Common.colorize("&aRemoved spawn point #" + (spawnIndex + 1) + ". Remaining: " + eventData.getSpawns().size()));
     }
 
-    // Prevent players from manipulating marker armor stands
+    // Prevent damage to marker mannequins
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void onArmorStandManipulate(PlayerArmorStandManipulateEvent event) {
-        ArmorStand armorStand = event.getRightClicked();
+    public void onMarkerDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Mannequin mannequin)) return;
 
-        if (EventSpawnMarkerManager.getInstance().isMarker(armorStand)) {
-            event.setCancelled(true);
-        }
-    }
-
-    // Prevent damage to marker armor stands
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onArmorStandDamage(EntityDamageByEntityEvent event) {
-        if (!(event.getEntity() instanceof ArmorStand armorStand)) return;
-
-        if (!EventSpawnMarkerManager.getInstance().isMarker(armorStand)) return;
+        if (!EventSpawnMarkerManager.getInstance().isMarker(mannequin)) return;
 
         // Cancel damage in all cases
         event.setCancelled(true);
 
         // Check if the damager is a player (left-click)
         if (!(event.getDamager() instanceof Player player)) return;
+
+        // Some client/server combos can emit duplicate damage callbacks for one swing.
+        if (!markerDamageCooldown.add(player.getUniqueId())) return;
+        org.bukkit.Bukkit.getScheduler().runTask(
+                ZonePractice.getInstance(),
+                () -> markerDamageCooldown.remove(player.getUniqueId())
+        );
 
         // Check if player is in setup mode
         if (!setupManager.isSettingUp(player)) return;
@@ -171,12 +237,13 @@ public class EventSetupListener implements Listener {
         // Check if in correct mode
         if (session.getCurrentMode() != EventSetupMode.SPAWN_POINTS) return;
 
-        // Left-click on armor stand = Remove last spawn (same as left-click on block)
+        // Left-click on mannequin marker = Remove last spawn (same as left-click on block)
         if (!eventData.getSpawns().isEmpty()) {
             int index = eventData.getSpawns().size() - 1;
             eventData.getSpawns().remove(index);
             EventSpawnMarkerManager.getInstance().updateMarkers(eventData);
             updateGui(eventData);
+            scheduleSave(eventData);
             player.sendMessage(Common.colorize("&cRemoved last spawn point. Remaining: " + index));
         } else {
             player.sendMessage(Common.colorize("&cNo spawn points to remove."));
@@ -195,7 +262,7 @@ public class EventSetupListener implements Listener {
         }
     }
 
-    private void handleModeSwitch(Player player, EventWandSetupManager.SetupSession session, EventData eventData, Action action) {
+    private void handleModeSwitch(Player player, EventWandSetupManager.SetupSession session, Action action) {
         if (action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK) {
             session.setCurrentMode(setupManager.getNextMode(session.getCurrentMode()));
         } else if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
@@ -236,6 +303,7 @@ public class EventSetupListener implements Listener {
         }
 
         updateGui(eventData);
+        scheduleSave(eventData);
     }
 
     private void handleSpawnPoints(Player player, EventData eventData, Action action, PlayerInteractEvent event) {
@@ -254,18 +322,24 @@ public class EventSetupListener implements Listener {
             Block block = event.getClickedBlock();
             if (block == null) return;
 
-            Location spawnLoc = block.getLocation().clone().add(0.5, 1, 0.5);
-            spawnLoc.setYaw(player.getLocation().getYaw());
-            spawnLoc.setPitch(player.getLocation().getPitch());
+            Location spawnLoc = getSnappedLocation(block, player);
 
             if (!eventData.getCuboid().contains(spawnLoc)) {
                 player.sendMessage(Common.colorize("&cSpawn point must be within the event cuboid!"));
                 return;
             }
 
-            eventData.addSpawn(spawnLoc);
+            try {
+                eventData.addSpawn(spawnLoc);
+            } catch (IllegalStateException ex) {
+                // Ignore duplicate/invalid add attempts and show the setup error to the player.
+                player.sendMessage(Common.colorize("&c" + ex.getMessage()));
+                return;
+            }
+
             EventSpawnMarkerManager.getInstance().updateMarkers(eventData);
             updateGui(eventData);
+            scheduleSave(eventData);
 
             player.sendMessage(Common.colorize("&aAdded spawn point #" + eventData.getSpawns().size() + " at your location."));
         }
@@ -276,6 +350,7 @@ public class EventSetupListener implements Listener {
                 eventData.getSpawns().remove(index);
                 EventSpawnMarkerManager.getInstance().updateMarkers(eventData);
                 updateGui(eventData);
+                scheduleSave(eventData);
                 player.sendMessage(Common.colorize("&cRemoved last spawn point. Remaining: " + index));
             } else {
                 player.sendMessage(Common.colorize("&cNo spawn points to remove."));
@@ -305,21 +380,15 @@ public class EventSetupListener implements Listener {
                 eventData.setEnabled(true);
                 player.sendMessage(Common.colorize("&aEnabled event: &e" + eventData.getType().getName()));
 
-                // When enabling an event, cleanup: clear markers and end setup mode for all players
-                List<Player> playersSettingUp = new ArrayList<>(setupManager.getPlayersSettingUpEvent(eventData));
-
-                // Clear markers first (before ending setup, to avoid duplicate clears)
-                if (!playersSettingUp.isEmpty()) {
-                    EventSpawnMarkerManager.getInstance().clearMarkers(eventData);
-                }
-
                 // End setup mode for all players currently setting up this event
+                List<Player> playersSettingUp = new ArrayList<>(setupManager.getPlayersSettingUpEvent(eventData));
                 for (Player settingUpPlayer : playersSettingUp) {
                     setupManager.stopSetup(settingUpPlayer);
                 }
             }
 
             updateGui(eventData);
+            scheduleSave(eventData);
         } catch (Exception e) {
             player.sendMessage(Common.colorize("&cError toggling status: " + e.getMessage()));
         }
@@ -330,6 +399,19 @@ public class EventSetupListener implements Listener {
             if (EventSetupManager.getInstance().getEventSetupGUIs().get(eventData).containsKey(GUIType.Event_Main)) {
                 EventSetupManager.getInstance().getEventSetupGUIs().get(eventData).get(GUIType.Event_Main).update();
             }
+            GUIManager.getInstance().getGuis().get(GUIType.Event_Summary).update();
         }
+    }
+
+    private static Location getSnappedLocation(org.bukkit.block.Block clickedBlock, Player player) {
+        Location loc = clickedBlock.getLocation().add(0.5, 1, 0.5);
+        float snappedYaw = Math.round(player.getLocation().getYaw() / 45f) * 45f;
+        loc.setYaw(snappedYaw);
+        loc.setPitch(0.0f);
+        return loc;
+    }
+
+    private static void scheduleSave(EventData eventData) {
+        org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(ZonePractice.getInstance(), eventData::setData);
     }
 }

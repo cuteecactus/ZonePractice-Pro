@@ -126,15 +126,15 @@ public abstract class Event implements Spectatable, dev.nandi0813.api.Interface.
 
     public abstract void killPlayer(Player player, boolean teleport);
 
-    public void startQueue() {
+    public boolean startQueue() {
         EventStartEvent event = new EventStartEvent(this);
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled()) {
-            return;
+            return false;
         }
 
         if (!this.status.equals(EventStatus.COLLECTING)) {
-            return;
+            return false;
         }
 
         this.queueRunnable.begin();
@@ -150,6 +150,8 @@ public abstract class Event implements Spectatable, dev.nandi0813.api.Interface.
         if (starter instanceof Player) {
             this.addPlayer((Player) starter);
         }
+
+        return true;
     }
 
     public void stopQueue() {
@@ -218,11 +220,13 @@ public abstract class Event implements Spectatable, dev.nandi0813.api.Interface.
         // Cancel all runnables first to prevent interference
         this.cancelAllRunnable();
 
+        // Set status to END *before* removeAll() so that killPlayer/checkIfEnd
+        // cannot re-trigger endEvent() while we are already cleaning up.
+        this.status = EventStatus.END;
+
         // Remove all players and spectators
         this.removeAll();
 
-        // Set status to END
-        this.status = EventStatus.END;
 
         // Rollback fight changes if event was live
         if (wasLive) {
@@ -277,10 +281,15 @@ public abstract class Event implements Spectatable, dev.nandi0813.api.Interface.
     @Override
     public GUIItem getSpectatorMenuItem() {
         return GUIFile.getGuiItem("GUIS.SPECTATOR-MENU.ICONS.EVENT-ICON")
-                .setMaterial(eventData.getIcon().getMaterial()).setDamage(eventData.getIcon().getDamage()).replace("%event_type%", type.getName())
+                .setBaseItem(eventData.getIcon().get()).replace("%event_type%", type.getName())
                 .replace("%event_duration%", this.getDurationRunnable().getFormattedTime())
                 .replace("%players%", String.valueOf(players.size())).replace("%spectators%", String.valueOf(spectators.size()));
 
+    }
+
+    @Override
+    public boolean isBuild() {
+        return false;
     }
 
     @Override
@@ -295,6 +304,11 @@ public abstract class Event implements Spectatable, dev.nandi0813.api.Interface.
 
         if (spectator) for (Player player : spectators)
             Common.sendMMMessage(player, message);
+    }
+
+    @Override
+    public List<Player> getActivePlayerList() {
+        return this.players;
     }
 
     public abstract StartRunnable getStartRunnable();

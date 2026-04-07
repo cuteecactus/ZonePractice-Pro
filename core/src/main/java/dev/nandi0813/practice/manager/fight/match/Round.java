@@ -11,10 +11,10 @@ import dev.nandi0813.practice.manager.fight.match.runnable.round.RoundStartRunna
 import dev.nandi0813.practice.manager.fight.match.util.MatchFightPlayer;
 import dev.nandi0813.practice.manager.fight.match.util.MatchUtil;
 import dev.nandi0813.practice.manager.fight.match.util.TempKillPlayer;
+import dev.nandi0813.practice.manager.fight.util.BedUtil;
 import dev.nandi0813.practice.manager.fight.util.Stats.Statistic;
 import dev.nandi0813.practice.manager.ladder.enums.LadderType;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.StringUtil;
 import dev.nandi0813.practice.util.entityhider.PlayerHider;
 import dev.nandi0813.practice.util.playerutil.PlayerUtil;
@@ -54,8 +54,8 @@ public abstract class Round extends BukkitRunnable {
                 this.bedStatus.put(team, true);
 
             // Set the beds
-            ClassImport.getClasses().getBedUtil().placeBed(match.getArena().getBedLoc1().getLocation(), match.getArena().getBedLoc1().getFacing());
-            ClassImport.getClasses().getBedUtil().placeBed(match.getArena().getBedLoc2().getLocation(), match.getArena().getBedLoc2().getFacing());
+            BedUtil.placeBed(match.getArena().getBedLoc1().getLocation(), match.getArena().getBedLoc1().getFacing());
+            BedUtil.placeBed(match.getArena().getBedLoc2().getLocation(), match.getArena().getBedLoc2().getFacing());
         }
 
         for (Player player : match.getPlayers()) {
@@ -67,6 +67,7 @@ public abstract class Round extends BukkitRunnable {
     }
 
     public void startRound() {
+        this.match.clearRoundDeathCauses();
         this.roundStartRunnable = new RoundStartRunnable(this).begin();
 
         for (Player player : match.getPlayers()) {
@@ -96,29 +97,33 @@ public abstract class Round extends BukkitRunnable {
 
         boolean isEndMatch = match.isEndMatch();
 
-        if (!isEndMatch) {
-            if (!this.match.getLadder().getType().equals(LadderType.BRIDGES)) {
-                this.match.resetMap();
-            } else if (this.match.getLadder().isResetBuildAfterRound()) {
-                this.match.resetMap();
-            }
-        }
+        // Determine whether the arena needs to be rolled back before the next round.
+        boolean needsReset = !isEndMatch && (
+                !this.match.getLadder().getType().equals(LadderType.BRIDGES) ||
+                this.match.getLadder().isResetBuildAfterRound()
+        );
 
-        /*
-         * Ezt be kell fejezni
-         *
-         * set/get winner abstract parancs ami objectet vesz át és ad vissza
-         */
         if (this.roundStartRunnable != null)
             this.roundStartRunnable.cancel();
 
-        if (this.roundEndRunnable == null) {
-            this.roundEndRunnable = new RoundEndRunnable(this, isEndMatch).begin();
-        } else {
-            if (!this.roundEndRunnable.isEnded() && isEndMatch) {
-                this.roundEndRunnable.cancel();
+        if (isEndMatch) {
+            // Match is over — start the end countdown normally.
+            if (this.roundEndRunnable == null) {
                 this.roundEndRunnable = new RoundEndRunnable(this, true).begin();
+            } else {
+                if (!this.roundEndRunnable.isEnded()) {
+                    this.roundEndRunnable.cancel();
+                    this.roundEndRunnable = new RoundEndRunnable(this, true).begin();
+                }
             }
+        } else if (needsReset) {
+            // Non-ending round that requires an arena rollback.
+            // Delay rollback until after ROUND_END_DELAY so death effects/titles stay visible.
+            // suppressNextRound=true because rollback callback will start the next round.
+            this.roundEndRunnable = new RoundEndRunnable(this, false, true, true).begin();
+        } else {
+            // Non-ending round, no reset needed — start the next round immediately.
+            this.roundEndRunnable = new RoundEndRunnable(this, false).begin();
         }
 
         if (this.isRunning())

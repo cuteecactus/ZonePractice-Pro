@@ -1,12 +1,12 @@
 package dev.nandi0813.practice.command.event.arguments.Events;
 
-import dev.nandi0813.practice.command.event.arguments.SpawnPointArg;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.fight.event.EventManager;
 import dev.nandi0813.practice.manager.fight.event.enums.EventType;
 import dev.nandi0813.practice.manager.fight.event.events.duel.sumo.SumoData;
 import dev.nandi0813.practice.manager.fight.event.util.EventUtil;
 import dev.nandi0813.practice.util.Common;
+import dev.nandi0813.practice.util.KitData;
 import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
@@ -36,13 +36,34 @@ public enum SumoArg {
                 EventUtil.changeStatus(sumoData, player);
             else
                 Common.sendMMMessage(player, LanguageManager.getString("COMMAND.EVENT.ARGUMENTS.SUMO.EVENT-ALREADY-ENABLED"));
+            return;
         } else if (args.length == 2 && args[1].equalsIgnoreCase("disable")) {
             if (sumoData.isEnabled())
                 EventUtil.changeStatus(sumoData, player);
             else
                 Common.sendMMMessage(player, LanguageManager.getString("COMMAND.EVENT.ARGUMENTS.SUMO.EVENT-ALREADY-DISABLED"));
-        } else
+            return;
+        } else if (args.length == 2 && args[1].equalsIgnoreCase("help")) {
             sendHelpMSG(player, label);
+
+            return;
+        }
+
+        // Checking if the arena is enabled, if it is, it will send a message to the player and return.
+        if (sumoData.isEnabled()) {
+            Common.sendMMMessage(player, LanguageManager.getString("COMMAND.EVENT.ARGUMENTS.SUMO.CANT-EDIT"));
+            return;
+        }
+
+        // Setting the kit for the event.
+        if (args.length == 2 && args[1].equalsIgnoreCase("setkit")) {
+            KitData kitData = sumoData.getKitData();
+            kitData.setKitData(player, true);
+
+            Common.sendMMMessage(player, LanguageManager.getString("COMMAND.EVENT.ARGUMENTS.SUMO.KIT-SET"));
+        } else {
+            sendHelpMSG(player, label);
+        }
     }
 
     private static void sendHelpMSG(Player player, String label) {
@@ -58,6 +79,7 @@ public enum SumoArg {
         if (args.length == 2) {
             arguments.add("enable");
             arguments.add("disable");
+            arguments.add("setkit");
 
             return StringUtil.copyPartialMatches(args[1], arguments, new ArrayList<>());
         }

@@ -6,6 +6,8 @@ import dev.nandi0813.practice.manager.gui.GUI;
 import dev.nandi0813.practice.manager.gui.GUIType;
 import dev.nandi0813.practice.manager.party.Party;
 import dev.nandi0813.practice.manager.party.PartyManager;
+import dev.nandi0813.practice.manager.profile.Profile;
+import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.InventoryUtil;
 import dev.nandi0813.practice.util.StringUtil;
@@ -96,13 +98,14 @@ public class PartySettingsGui extends GUI {
                     Common.sendMMMessage(player, LanguageManager.getString("PARTY.NO-PERMISSION"));
             case 11:
                 if (player.hasPermission("zpp.party.changelimit")) {
+                    int groupPartyLimit = PartyManager.getInstance().resolvePartyMemberLimit(party.getLeader());
                     if (clickType.isLeftClick() && party.getMaxPlayerLimit() > 2) {
                         if (party.getMembers().size() < party.getMaxPlayerLimit()) {
                             party.setMaxPlayerLimit(party.getMaxPlayerLimit() - 1);
                             update();
                         } else
                             Common.sendMMMessage(player, LanguageManager.getString("PARTY.CANT-DECREASE-LIMIT"));
-                    } else if (clickType.isRightClick() && party.getMaxPlayerLimit() < PartyManager.MAX_PARTY_MEMBERS) {
+                    } else if (clickType.isRightClick() && party.getMaxPlayerLimit() < groupPartyLimit) {
                         party.setMaxPlayerLimit(party.getMaxPlayerLimit() + 1);
                         update();
                     }
@@ -140,18 +143,32 @@ public class PartySettingsGui extends GUI {
                 break;
             case 16:
                 if (player.hasPermission("zpp.party.broadcast")) {
-                    if (PlayerCooldown.isActive(player, CooldownObject.BROADCAST_PARTY_CHANGE)) {
-                        Common.sendMMMessage(player, StringUtil.replaceSecondString(LanguageManager.getString("WAIT-FOR-COOLDOWN"), PlayerCooldown.getLeftInDouble(player, CooldownObject.LEADERBOARD_GUI_REFRESH)));
-                        return;
-                    }
-
-                    PlayerCooldown.addCooldown(player, CooldownObject.BROADCAST_PARTY_CHANGE, 5);
-
                     if (party.isBroadcastParty()) {
+                        if (PlayerCooldown.isActive(player, CooldownObject.BROADCAST_PARTY_CHANGE)) {
+                            Common.sendMMMessage(player, StringUtil.replaceSecondString(LanguageManager.getString("WAIT-FOR-COOLDOWN"), PlayerCooldown.getLeftInDouble(player, CooldownObject.BROADCAST_PARTY_CHANGE)));
+                            return;
+                        }
+
+                        PlayerCooldown.addCooldown(player, CooldownObject.BROADCAST_PARTY_CHANGE, 5);
                         party.getBroadcastTask().cancel();
                         update();
                     } else {
                         if (party.isPublicParty()) {
+                            Profile leaderProfile = ProfileManager.getInstance().getProfile(player);
+                            if (!player.hasPermission("zpp.bypass.party.broadcast.limit") && leaderProfile.getPartyBroadcastLeft() <= 0) {
+                                Common.sendMMMessage(player, LanguageManager.getString("PARTY.NO-BROADCAST-LEFT"));
+                                return;
+                            }
+                            if (!player.hasPermission("zpp.bypass.party.broadcast.limit")) {
+                                leaderProfile.setPartyBroadcastLeft(leaderProfile.getPartyBroadcastLeft() - 1);
+                            }
+
+                            if (PlayerCooldown.isActive(player, CooldownObject.BROADCAST_PARTY_CHANGE)) {
+                                Common.sendMMMessage(player, StringUtil.replaceSecondString(LanguageManager.getString("WAIT-FOR-COOLDOWN"), PlayerCooldown.getLeftInDouble(player, CooldownObject.BROADCAST_PARTY_CHANGE)));
+                                return;
+                            }
+
+                            PlayerCooldown.addCooldown(player, CooldownObject.BROADCAST_PARTY_CHANGE, 5);
                             party.getBroadcastTask().begin();
                             update();
                         } else

@@ -8,10 +8,11 @@ import dev.nandi0813.practice.manager.fight.event.events.ffa.lms.LMS;
 import dev.nandi0813.practice.manager.fight.event.events.onevsall.tnttag.TNTTag;
 import dev.nandi0813.practice.manager.fight.event.interfaces.Event;
 import dev.nandi0813.practice.manager.fight.event.util.EventUtil;
+import dev.nandi0813.practice.manager.fight.util.BlockUtil;
+import dev.nandi0813.practice.manager.fight.util.PlayerUtil;
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.StringUtil;
 import dev.nandi0813.practice.util.cooldown.CooldownObject;
@@ -43,6 +44,10 @@ public class EventListener implements Listener {
         Player player = e.getPlayer();
         Profile profile = ProfileManager.getInstance().getProfile(player);
 
+        if (profile == null) {
+            return;
+        }
+
         if (!profile.getStatus().equals(ProfileStatus.EVENT)) {
             return;
         }
@@ -52,11 +57,15 @@ public class EventListener implements Listener {
         }
 
         Event event = EventManager.getInstance().getEventByPlayer(player);
+        if (event == null) {
+            return;
+        }
+
         if (!event.getStatus().equals(EventStatus.LIVE)) {
             return;
         }
 
-        ItemStack item = ClassImport.getClasses().getPlayerUtil().getItemInUse(player, EventManager.PLAYER_TRACKER.getType());
+        ItemStack item = PlayerUtil.getItemInUse(player, EventManager.PLAYER_TRACKER.getType());
         if (item == null) {
             return;
         }
@@ -98,11 +107,19 @@ public class EventListener implements Listener {
         Player player = (Player) e.getEntity();
         Profile profile = ProfileManager.getInstance().getProfile(player);
 
+        if (profile == null) {
+            return;
+        }
+
         if (!profile.getStatus().equals(ProfileStatus.EVENT)) {
             return;
         }
 
         Event event = EventManager.getInstance().getEventByPlayer(player);
+        if (event == null) {
+            return;
+        }
+
         if (!(event instanceof Brackets) && !(event instanceof LMS)) {
             e.setFoodLevel(20);
         }
@@ -145,7 +162,7 @@ public class EventListener implements Listener {
     public void onEntityExplode(EntityExplodeEvent e) {
         Entity entity = e.getEntity();
 
-        if (entity.hasMetadata(TNTTag.TNT_TAG_TNT_METADATA)) {
+        if (BlockUtil.hasMetadata(entity, TNTTag.TNT_TAG_TNT_METADATA)) {
             e.blockList().clear();
         }
     }
@@ -326,4 +343,17 @@ public class EventListener implements Listener {
         eventManager.getEventListeners().get(event.getType()).onInventoryClick(event, e);
     }
 
+    @EventHandler
+    public void onPlayerItemHeld(final PlayerItemHeldEvent e) {
+        Player player = e.getPlayer();
+        Profile profile = ProfileManager.getInstance().getProfile(player);
+        if (!profile.getStatus().equals(ProfileStatus.EVENT)) {
+            return;
+        }
+
+        Event event = eventManager.getEventByPlayer(player);
+        if (event == null) {
+            return;
+        }
+    }
 }

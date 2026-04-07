@@ -191,11 +191,11 @@ public class SettingsGui extends GUI {
         if (settingTypes.contains(SettingType.FIREBALL_COOLDOWN))
             settingItems.add(new FireballCooldownItem(this, ladder));
 
+        if (settingTypes.contains(SettingType.FIREBALL_BLOCK_DESTROY))
+            settingItems.add(new FireballBlockDestroyItem(this, ladder));
+
         if (settingTypes.contains(SettingType.SKYWARS_LOOT))
             settingItems.add(new SkywarsLootItem(this, (SkyWars) ladder));
-
-        if (settingTypes.contains(SettingType.TEMP_BUILD_DELAY))
-            settingItems.add(new TempbuildDelayItem(this, ladder));
 
         if (settingTypes.contains(SettingType.MAX_DURATION))
             settingItems.add(new MaxDurationItem(this, ladder));
@@ -208,6 +208,30 @@ public class SettingsGui extends GUI {
 
         if (settingTypes.contains(SettingType.RESET_BUILD_AFTER_ROUND))
             settingItems.add(new ResetBuildAfterRoundItem(this, ladder));
+
+        if (settingTypes.contains(SettingType.BREAK_ALL_BLOCKS))
+            settingItems.add(new BreakAllBlocksItem(this, ladder));
+
+        if (settingTypes.contains(SettingType.SPLEEF_SNOWBALL_MODE))
+            settingItems.add(new SpleefSnowballModeItem(this, (dev.nandi0813.practice.manager.ladder.type.Spleef) ladder));
+
+        if (settingTypes.contains(SettingType.BLOCK_RETURN_DELAY))
+            settingItems.add(new BlockReturnDelayItem(this, ladder));
+
+        if (settingTypes.contains(SettingType.TEMP_BUILD_RETURN_DELAY))
+            settingItems.add(new TempBuildReturnDelayItem(this, ladder));
+
+        if (settingTypes.contains(SettingType.ROUND_END_DELAY))
+            settingItems.add(new RoundEndDelayItem(this, ladder));
+
+        if (settingTypes.contains(SettingType.ROUND_STATUS_TITLES))
+            settingItems.add(new RoundStatusTitlesItem(this, ladder));
+
+        if (settingTypes.contains(SettingType.COUNTDOWN_TITLES))
+            settingItems.add(new CountdownTitlesItem(this, ladder));
+
+        if (settingTypes.contains(SettingType.WIND_CHARGE_COOLDOWN))
+            settingItems.add(new WindChargeCooldownItem(this, ladder));
     }
 
 }

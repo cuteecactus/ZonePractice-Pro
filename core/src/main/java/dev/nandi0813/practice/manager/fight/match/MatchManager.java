@@ -1,10 +1,8 @@
 package dev.nandi0813.practice.manager.fight.match;
 
-import com.github.retrooper.packetevents.PacketEvents;
-import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.arena.arenas.interfaces.BasicArena;
-import dev.nandi0813.practice.manager.fight.belowname.BelowNameManager;
+import dev.nandi0813.practice.manager.fight.match.listener.LadderTypeListener;
 import dev.nandi0813.practice.manager.fight.match.listener.MatchEventListener;
 import dev.nandi0813.practice.manager.fight.match.listener.MatchLifecycleListener;
 import dev.nandi0813.practice.manager.fight.match.listener.StartListener;
@@ -12,6 +10,7 @@ import dev.nandi0813.practice.manager.fight.match.type.duel.Duel;
 import dev.nandi0813.practice.manager.fight.match.util.RematchRequest;
 import dev.nandi0813.practice.manager.ladder.abstraction.Ladder;
 import dev.nandi0813.practice.manager.ladder.settings.CentralizedSettingListener;
+import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.spectator.SpectatorManager;
 import dev.nandi0813.practice.util.interfaces.Spectatable;
 import lombok.Getter;
@@ -19,6 +18,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Getter
 public class MatchManager {
@@ -31,11 +32,11 @@ public class MatchManager {
         return instance;
     }
 
-    private final BelowNameManager belowNameManager;
+    private final NametagManager belowNameManager;
 
-    private final Map<String, Match> matches = new HashMap<>();
-    private final List<Match> liveMatches = new ArrayList<>();
-    private final Map<Player, Match> playerMatches = new HashMap<>();
+    private final Map<String, Match> matches = new ConcurrentHashMap<>();
+    private final List<Match> liveMatches = new CopyOnWriteArrayList<>();
+    private final Map<Player, Match> playerMatches = new ConcurrentHashMap<>();
     private final Set<RematchRequest> rematches = new HashSet<>();
 
     private MatchManager() {
@@ -53,12 +54,32 @@ public class MatchManager {
         // Register start command listener
         Bukkit.getPluginManager().registerEvents(new StartListener(), practice);
 
-        this.belowNameManager = BelowNameManager.getInstance();
-        PacketEvents.getAPI().getEventManager().registerListener(this.belowNameManager, PacketListenerPriority.NORMAL);
+        Bukkit.getPluginManager().registerEvents(new LadderTypeListener(), practice);
+
+
+        this.belowNameManager = NametagManager.getInstance();
+        // PacketEvents.getAPI().getEventManager().registerListener(this.belowNameManager, PacketListenerPriority.NORMAL);
     }
 
     public Match getLiveMatchByPlayer(Player player) {
-        return this.playerMatches.getOrDefault(player, null);
+        Match match = this.playerMatches.get(player);
+        if (match != null) {
+            return match;
+        }
+
+        // Recover from stale Player-object keys by resolving via UUID.
+        UUID playerUuid = player.getUniqueId();
+        for (Match liveMatch : this.liveMatches) {
+            // Snapshot players to avoid CME if match player lists mutate during packet-thread checks.
+            for (Player livePlayer : new ArrayList<>(liveMatch.getPlayers())) {
+                if (playerUuid.equals(livePlayer.getUniqueId())) {
+                    this.playerMatches.put(player, liveMatch);
+                    return liveMatch;
+                }
+            }
+        }
+
+        return null;
     }
 
     public Match getLiveMatchBySpectator(Player spectator) {
@@ -155,6 +176,23 @@ public class MatchManager {
             if (rematchRequest.getPlayers().contains(player))
                 return rematchRequest;
         return null;
+    }
+
+    public void invalidateRematch(RematchRequest rematchRequest) {
+        if (rematchRequest == null) return;
+
+        if (rematches.remove(rematchRequest)) {
+            rematchRequest.invalidate();
+        }
+    }
+
+    public void invalidateRematchByPlayer(Player player) {
+        if (player == null) return;
+
+        RematchRequest rematchRequest = getRematchRequest(player);
+        if (rematchRequest != null) {
+            invalidateRematch(rematchRequest);
+        }
     }
 
 }

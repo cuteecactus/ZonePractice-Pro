@@ -1,9 +1,10 @@
 package dev.nandi0813.practice.manager.ladder.abstraction.normal;
 
 import dev.nandi0813.practice.manager.backend.ConfigFile;
+import dev.nandi0813.practice.manager.ladder.abstraction.interfaces.BlockReturnDelay;
 import dev.nandi0813.practice.manager.ladder.abstraction.interfaces.CustomConfig;
 import dev.nandi0813.practice.manager.ladder.abstraction.interfaces.RespawnableLadder;
-import dev.nandi0813.practice.manager.ladder.abstraction.interfaces.TempBuild;
+import dev.nandi0813.practice.manager.ladder.abstraction.interfaces.TempBuildReturnDelay;
 import dev.nandi0813.practice.manager.ladder.enums.WeightClassType;
 import dev.nandi0813.practice.manager.ladder.util.LadderFileUtil;
 import dev.nandi0813.practice.util.BasicItem;
@@ -38,12 +39,13 @@ public class LadderFile extends ConfigFile {
         config.set("settings.editable", ladder.isEditable());
         config.set("settings.drop-inventory", ladder.isDropInventoryPartyGames());
         config.set("settings.multiRoundStartCountdown", ladder.isMultiRoundStartCountdown());
-        config.set("settings.hitdelay", ladder.getHitDelay());
+        config.set("settings.hitdelay", ladder.getAttackCooldownModifier());
         config.set("settings.rounds", ladder.getRounds());
         config.set("settings.maxduration", ladder.getMaxDuration());
         config.set("settings.epcooldown", ladder.getEnderPearlCooldown());
         config.set("settings.gacooldown", ladder.getGoldenAppleCooldown());
         config.set("settings.fireworkcooldown", ladder.getFireworkRocketCooldown());
+        config.set("settings.windchargecooldown", ladder.getWindChargeCooldown());
         config.set("settings.startcountdown", ladder.getStartCountdown());
         config.set("settings.startmove", ladder.isStartMove());
         config.set("settings.matchtypes", LadderFileUtil.getMatchTypeNames(ladder.getMatchTypes()));
@@ -51,13 +53,21 @@ public class LadderFile extends ConfigFile {
         config.set("settings.tntfusetime", ladder.getTntFuseTime());
         config.set("settings.healthbelowname", ladder.isHealthBelowName());
         config.set("settings.resetbuildafterround", ladder.isResetBuildAfterRound());
+        config.set("settings.breakallblocks", ladder.isBreakAllBlocks());
+        config.set("settings.roundenddelay", ladder.getRoundEndDelay());
+        config.set("settings.roundstatustitles", ladder.isRoundStatusTitles());
+        config.set("settings.countdowntitles", ladder.isCountdownTitles());
 
         if (ladder instanceof RespawnableLadder respawnableLadder) {
             config.set("settings.respawntime", respawnableLadder.getRespawnTime());
         }
 
-        if (ladder instanceof TempBuild tempBuild) {
-            config.set("settings.tempbuild-delay", tempBuild.getBuildDelay());
+        if (ladder instanceof BlockReturnDelay blockReturnDelay) {
+            config.set("settings.block-return-delay", blockReturnDelay.getBlockReturnDelaySeconds());
+        }
+
+        if (ladder instanceof TempBuildReturnDelay tempBuildReturnDelay) {
+            config.set("settings.temp-build-return-delay", tempBuildReturnDelay.getTempBuildReturnDelaySeconds());
         }
 
         if (ladder.getIcon() != null)
@@ -145,12 +155,38 @@ public class LadderFile extends ConfigFile {
             ladder.setResetBuildAfterRound(config.getBoolean("settings.resetbuildafterround"));
         }
 
+        if (config.isBoolean("settings.breakallblocks")) {
+            ladder.setBreakAllBlocks(config.getBoolean("settings.breakallblocks"));
+        }
+
+        if (config.isInt("settings.roundenddelay")) {
+            int roundEndDelay = config.getInt("settings.roundenddelay");
+            if (roundEndDelay < 0 || roundEndDelay > 30) roundEndDelay = 3;
+            ladder.setRoundEndDelay(roundEndDelay);
+        } else
+            ladder.setRoundEndDelay(3);
+
+        if (config.isBoolean("settings.roundstatustitles")) {
+            ladder.setRoundStatusTitles(config.getBoolean("settings.roundstatustitles"));
+        } else
+            ladder.setRoundStatusTitles(true);
+
+        if (config.isBoolean("settings.countdowntitles")) {
+            ladder.setCountdownTitles(config.getBoolean("settings.countdowntitles"));
+        } else
+            ladder.setCountdownTitles(true);
+
         if (config.isInt("settings.hitdelay")) {
             int hitDelay = config.getInt("settings.hitdelay");
-            if (hitDelay < 0 || hitDelay > 100) hitDelay = 20;
-            ladder.setHitDelay(hitDelay);
+            // Convert old int-based hitdelay (ticks) to multiplier: divide by 20 (default ticks)
+            double multiplier = Math.clamp(hitDelay / 20.0, 0, 3.0);
+            ladder.setAttackCooldownModifier(multiplier);
+        } else if (config.isDouble("settings.hitdelay")) {
+            double hitDelay = config.getDouble("settings.hitdelay");
+            if (hitDelay < 0 || hitDelay > 3.0) hitDelay = 1.0;
+            ladder.setAttackCooldownModifier(hitDelay);
         } else
-            ladder.setHitDelay(20);
+            ladder.setAttackCooldownModifier(1.0);
 
         if (config.isInt("settings.rounds")) {
             int rounds = config.getInt("settings.rounds");
@@ -182,6 +218,14 @@ public class LadderFile extends ConfigFile {
             ladder.setFireworkRocketCooldown(fireworkCooldown);
         }
 
+        if (config.isInt("settings.windchargecooldown")) {
+            int windChargeCooldown = config.getInt("settings.windchargecooldown");
+            if (windChargeCooldown < 0 || windChargeCooldown > 30) windChargeCooldown = 0;
+            ladder.setWindChargeCooldown(windChargeCooldown);
+        } else {
+            ladder.setWindChargeCooldown(0);
+        }
+
         if (config.isInt("settings.startcountdown")) {
             int startCountdown = config.getInt("settings.startcountdown");
             if (startCountdown < 2 || startCountdown > 5) startCountdown = 3;
@@ -205,13 +249,43 @@ public class LadderFile extends ConfigFile {
                 respawnableLadder.setRespawnTime(3);
         }
 
-        if (ladder instanceof TempBuild tempBuild) {
-            if (config.isInt("settings.tempbuild-delay")) {
-                int buildDelay = config.getInt("settings.tempbuild-delay");
-                if (buildDelay < 3 || buildDelay > 30) buildDelay = 6;
-                tempBuild.setBuildDelay(buildDelay);
-            } else
-                tempBuild.setBuildDelay(6);
+        if (ladder instanceof BlockReturnDelay blockReturnDelay) {
+            int buildDelay = 6;
+
+            if (config.isInt("settings.block-return-delay")) {
+                buildDelay = config.getInt("settings.block-return-delay");
+            } else if (config.isInt("settings.tempbuild-delay")) {
+                // Backward compatibility for older ladder templates.
+                buildDelay = config.getInt("settings.tempbuild-delay");
+            } else if (config.isInt("tempbuild-delay")) {
+                // Backward compatibility for older root-level templates.
+                buildDelay = config.getInt("tempbuild-delay");
+            } else if (config.isInt("block-return-delay-seconds")) {
+                // Backward compatibility for previous naming.
+                buildDelay = config.getInt("block-return-delay-seconds");
+            }
+
+            if (buildDelay < -1 || buildDelay > 30) buildDelay = 6;
+            blockReturnDelay.setBlockReturnDelaySeconds(buildDelay);
+        }
+
+        if (ladder instanceof TempBuildReturnDelay tempBuildReturnDelay) {
+            int buildDelay = 6;
+
+            if (config.isInt("settings.temp-build-return-delay")) {
+                buildDelay = config.getInt("settings.temp-build-return-delay");
+            } else if (config.isInt("settings.tempbuild-delay")) {
+                buildDelay = config.getInt("settings.tempbuild-delay");
+            } else if (config.isInt("tempbuild-delay")) {
+                buildDelay = config.getInt("tempbuild-delay");
+            } else if (config.isInt("settings.block-return-delay")) {
+                buildDelay = config.getInt("settings.block-return-delay");
+            } else if (config.isInt("block-return-delay-seconds")) {
+                buildDelay = config.getInt("block-return-delay-seconds");
+            }
+
+            if (buildDelay < -1 || buildDelay > 30) buildDelay = 6;
+            tempBuildReturnDelay.setTempBuildReturnDelaySeconds(buildDelay);
         }
 
         if (config.isString("settings.knockback"))

@@ -4,17 +4,28 @@ import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.Common;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 
+import java.lang.reflect.Method;
 import java.util.*;
 
 public enum PlayerUtil {
     ;
+
+    private static void clearStuckArrows(Player player) {
+        try {
+            Method setArrowsInBody = player.getClass().getMethod("setArrowsInBody", int.class);
+            setArrowsInBody.invoke(player, 0);
+        } catch (Throwable ignored) {
+            // Older APIs may not expose arrow body count.
+        }
+    }
 
     public static void clearPlayer(Player player, boolean deleteInv, boolean fly, boolean entityCollide) {
         player.setFallDistance(0);
@@ -22,19 +33,22 @@ public enum PlayerUtil {
         player.setExp(0);
         player.setLevel(0);
         player.setFoodLevel(23);
+        clearStuckArrows(player);
         player.setGameMode(GameMode.SURVIVAL);
         player.setAllowFlight(fly);
         player.setFlying(fly);
-        ClassImport.getClasses().getPlayerUtil().setCollidesWithEntities(player, entityCollide);
+        dev.nandi0813.practice.manager.fight.util.PlayerUtil.setCollidesWithEntities(player, entityCollide);
 
-        Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () -> player.setFireTicks(0), 2L);
+        if (ZonePractice.getInstance().isEnabled()) {
+            Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () -> player.setFireTicks(0), 2L);
+        } else {
+            player.setFireTicks(0);
+        }
 
-        if (deleteInv) ClassImport.getClasses().getPlayerUtil().clearInventory(player);
+        if (deleteInv) dev.nandi0813.practice.manager.fight.util.PlayerUtil.clearInventory(player);
 
         for (PotionEffect potionEffect : player.getActivePotionEffects())
             player.removePotionEffect(potionEffect.getType());
-
-        player.setNoDamageTicks(20);
     }
 
     public static void setFightPlayer(Player player) {
@@ -44,7 +58,14 @@ public enum PlayerUtil {
             Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () -> player.setHealth(20), 2L);
             Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () -> player.setFireTicks(0), 2L);
             player.setFoodLevel(25);
-            player.resetMaxHealth();
+            AttributeInstance maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealth != null) {
+                maxHealth.setBaseValue(maxHealth.getDefaultValue());
+
+                if (player.getHealth() > maxHealth.getValue()) {
+                    player.setHealth(maxHealth.getValue());
+                }
+            }
             player.setFallDistance(0);
             player.setWalkSpeed(0.2F);
             for (PotionEffect potionEffect : player.getActivePotionEffects())
@@ -52,6 +73,9 @@ public enum PlayerUtil {
             player.setGameMode(GameMode.SURVIVAL);
             player.setFlying(false);
             player.setAllowFlight(false);
+            // Players can be marked non-collidable while temporarily spectating; restore combat hitboxes.
+            dev.nandi0813.practice.manager.fight.util.PlayerUtil.setCollidesWithEntities(player, true);
+            // Clear stale invulnerability frames so shield-stun / rapid follow-up hits work consistently.
         });
     }
 

@@ -3,7 +3,6 @@ package dev.nandi0813.practice.manager.ladder.enums;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.gui.setup.ladder.laddersettings.Settings.SettingType;
 import dev.nandi0813.practice.manager.ladder.type.*;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.Common;
 import lombok.Getter;
 import org.bukkit.Material;
@@ -24,6 +23,7 @@ public enum LadderType {
             )
             .withMovementSettings()
             .withTeamSettings()
+            .withRegenSettings()
             .withCommonSettings()
             .withPearlSettings()
     ),
@@ -37,6 +37,7 @@ public enum LadderType {
             .withBuild()
             .withMovementSettings()
             .withTeamSettings()
+            .withRegenSettings()
             .withCommonSettings()
             .withPearlSettings()
             .withBuildSettings()
@@ -51,6 +52,19 @@ public enum LadderType {
             .withTeamSettings()
             .withCommonSettings()
             .withPearlSettings()
+    ),
+
+    TNT_SUMO(LadderTypeConfig.builder(
+                    "LADDER.LADDER-TYPES.TNT-SUMO.NAME",
+            Material.TNT,
+                    "LADDER.LADDER-TYPES.TNT-SUMO.DESCRIPTION",
+                    TntSumo.class
+            )
+            .withBuild()
+            .withTeamSettings()
+            .withCommonSettings()
+            .withPearlSettings()
+            .withSetting(SettingType.TEMP_BUILD_RETURN_DELAY)
     ),
 
     BOXING(LadderTypeConfig.builder(
@@ -77,14 +91,15 @@ public enum LadderType {
             .withCommonSettings()
             .withSettings(
                     SettingType.GOLDEN_APPLE_COOLDOWN,
-                    SettingType.TEMP_BUILD_DELAY
+                    SettingType.TEMP_BUILD_RETURN_DELAY,
+                    SettingType.MULTI_ROUND_START_COUNTDOWN
             )
             .withBuildSettings()
     ),
 
     SPLEEF(LadderTypeConfig.builder(
                     "LADDER.LADDER-TYPES.SPLEEF.NAME",
-            ClassImport.getClasses().getItemMaterialUtil().getIronShovel(),
+            Material.IRON_SHOVEL,
                     "LADDER.LADDER-TYPES.SPLEEF.DESCRIPTION",
                     Spleef.class
             )
@@ -99,18 +114,23 @@ public enum LadderType {
                     SettingType.WEIGHT_CLASS,
                     SettingType.ROUNDS,
                     SettingType.MAX_DURATION,
-                    SettingType.START_COUNTDOWN
+                    SettingType.START_COUNTDOWN,
+                    SettingType.SPLEEF_SNOWBALL_MODE,
+                    SettingType.ROUND_END_DELAY,
+                    SettingType.COUNTDOWN_TITLES,
+                    SettingType.ROUND_STATUS_TITLES
             )
     ),
 
     SKYWARS(LadderTypeConfig.builder(
                     "LADDER.LADDER-TYPES.SKYWARS.NAME",
-            ClassImport.getClasses().getItemMaterialUtil().getEyeOfEnder(),
+            Material.ENDER_EYE,
                     "LADDER.LADDER-TYPES.SKYWARS.DESCRIPTION",
                     SkyWars.class
             )
             .withBuild()
             .withTeamSettings()
+            .withRegenSettings()
             .withCommonSettings()
             .withPearlSettings()
             .withBuildSettings()
@@ -119,7 +139,7 @@ public enum LadderType {
 
     BEDWARS(LadderTypeConfig.builder(
                     "LADDER.LADDER-TYPES.BEDWARS.NAME",
-            ClassImport.getClasses().getItemMaterialUtil().getRedBed(),
+            Material.RED_BED,
                     "LADDER.LADDER-TYPES.BEDWARS.DESCRIPTION",
                     BedWars.class
             )
@@ -127,6 +147,7 @@ public enum LadderType {
             .withBed()
             .noPartyFFA()
             .withRespawnSettings()
+            .withRegenSettings()
             .withCommonSettings()
             .withPearlSettings()
             .withBuildSettings()
@@ -134,7 +155,7 @@ public enum LadderType {
 
     FIREBALL_FIGHT(LadderTypeConfig.builder(
                     "LADDER.LADDER-TYPES.FIREBALL-FIGHT.NAME",
-            ClassImport.getClasses().getItemMaterialUtil().getFireball(),
+            Material.FIRE_CHARGE,
                     "LADDER.LADDER-TYPES.FIREBALL-FIGHT.DESCRIPTION",
                     FireballFight.class
             )
@@ -142,15 +163,33 @@ public enum LadderType {
             .withBed()
             .noPartyFFA()
             .withRespawnSettings()
+            .withRegenSettings()
+            .withRegenSettings()
             .withCommonSettings()
             .withPearlSettings()
             .withBuildSettings()
             .withSetting(SettingType.FIREBALL_COOLDOWN)
+            .withSetting(SettingType.FIREBALL_BLOCK_DESTROY)
+    ),
+
+    MLG_RUSH(LadderTypeConfig.builder(
+                    "LADDER.LADDER-TYPES.MLG-RUSH.NAME",
+            Material.BLUE_TERRACOTTA,
+                    "LADDER.LADDER-TYPES.MLG-RUSH.DESCRIPTION",
+                    MLGRush.class
+            )
+            .withBuild()
+            .withBed()
+            .noPartyFFA()
+            .withRespawnSettings()
+            .withCommonSettings()
+            .withPearlSettings()
+            .withSetting(SettingType.BLOCK_RETURN_DELAY)
     ),
 
     BRIDGES(LadderTypeConfig.builder(
                     "LADDER.LADDER-TYPES.BRIDGES.NAME",
-            ClassImport.getClasses().getItemMaterialUtil().getStainedClay(),
+            Material.RED_TERRACOTTA,
                     "LADDER.LADDER-TYPES.BRIDGES.DESCRIPTION",
                     Bridges.class
             )
@@ -166,7 +205,7 @@ public enum LadderType {
 
     BATTLE_RUSH(LadderTypeConfig.builder(
                     "LADDER.LADDER-TYPES.BATTLE-RUSH.NAME",
-            ClassImport.getClasses().getItemMaterialUtil().getLilyPad(),
+            Material.LILY_PAD,
                     "LADDER.LADDER-TYPES.BATTLE-RUSH.DESCRIPTION",
                     BattleRush.class
             )
@@ -177,7 +216,7 @@ public enum LadderType {
             .withCommonSettings()
             .withPearlSettings()
             .withBuildSettings()
-            .withSetting(SettingType.TEMP_BUILD_DELAY)
+            .withSetting(SettingType.TEMP_BUILD_RETURN_DELAY)
     );
 
     private final String name;

@@ -135,6 +135,35 @@ public class DivisionManager extends ConfigFile implements Listener {
         return this.divisions.get(index - 1);
     }
 
+    public boolean meetsMinimumForRanked(final Profile profile) {
+        if (profile == null || this.minimumForRanked == null) {
+            return true;
+        }
+
+        // Check against the minimum division's REQUIREMENTS, NOT ranked ELO
+        // (ranked elo is only achievable by playing ranked, which is locked behind this check)
+        int experience = profile.getStats().getExperience();
+        int wins = profile.getStats().getGlobalWins();
+
+        // Check experience requirement
+        if (experience < this.minimumForRanked.getExperience()) {
+            return false;
+        }
+
+        // Check wins requirement (only if wins are counted)
+        if (this.COUNT_BY_WINS && wins < this.minimumForRanked.getWin()) {
+            return false;
+        }
+
+        // NOTE: We deliberately do NOT check ELO here, because:
+        // - Global ELO only comes from ranked matches
+        // - Ranked is locked behind this check
+        // - This would create an infinite loop
+        // Players can unlock ranked with experience/wins, then earn ranked elo
+
+        return true;
+    }
+
     @Override
     public void setData() {
     }

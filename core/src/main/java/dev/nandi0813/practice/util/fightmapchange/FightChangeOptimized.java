@@ -1,7 +1,10 @@
 package dev.nandi0813.practice.util.fightmapchange;
 
 import dev.nandi0813.practice.ZonePractice;
-import dev.nandi0813.practice.module.interfaces.ChangedBlock;
+import dev.nandi0813.practice.manager.fight.util.BlockUtil;
+import dev.nandi0813.practice.manager.fight.util.ChangedBlock;
+import dev.nandi0813.practice.manager.fight.util.PlayerUtil;
+import dev.nandi0813.practice.manager.ladder.abstraction.interfaces.TempBuild;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.Cuboid;
 import dev.nandi0813.practice.util.interfaces.Spectatable;
@@ -11,6 +14,8 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -59,6 +64,17 @@ public class FightChangeOptimized {
     // Reusable rollback task
     private RollbackTask rollbackTask;
 
+    // Chunk tickets held only for the duration of a rollback to keep arena chunks loaded.
+    private final java.util.Set<Long> rollbackChunkTickets = new java.util.HashSet<>();
+
+    /**
+     * True while a rollback is in progress. Used by block spread/burn listeners to
+     * cancel new fire spread during the multi-tick rollback window so fire doesn't
+     * re-appear on blocks that have already been restored.
+     */
+    @Getter
+    private volatile boolean rollingBack = false;
+
     /**
      * Constructor for all fight types (Match, Event, FFA).
      *
@@ -67,6 +83,9 @@ public class FightChangeOptimized {
     public FightChangeOptimized(Spectatable spectatable) {
         this.spectatable = spectatable;
         this.cuboid = spectatable.getCuboid();
+        if (this.cuboid == null) {
+            throw new IllegalStateException("Cuboid is null for spectatable: " + spectatable.getClass().getSimpleName() + " — make sure the event/arena is fully configured before starting.");
+        }
         this.world = cuboid.getWorld();
     }
 
@@ -101,7 +120,7 @@ public class FightChangeOptimized {
         // Store Spectatable (Match/Event/FFA) for efficient metadata caching in BlockFromToEvent
         if (existing == null && spectatable != null) {
             Block block = change.getLocation().getBlock();
-            block.setMetadata(PLACED_IN_FIGHT, new org.bukkit.metadata.FixedMetadataValue(ZonePractice.getInstance(), spectatable));
+            BlockUtil.setMetadata(block, PLACED_IN_FIGHT, spectatable);
         }
     }
 
@@ -121,13 +140,34 @@ public class FightChangeOptimized {
 
     /**
      * Adds a temporary block change that will auto-remove after delay.
+     * Tracks the hand used for smarter item return placement.
      */
-    public void addBlockChange(ChangedBlock change, Player player, int destroyTime) {
+    public void addBlockChange(ChangedBlock change, Player player, int destroyTime, @org.jetbrains.annotations.Nullable EquipmentSlot handUsed) {
+        addBlockChange(change, player, destroyTime, handUsed, null);
+    }
+
+    /**
+     * Adds a temporary block change that will auto-remove after delay.
+     * Stores the exact placed item snapshot so returned items keep full ItemMeta.
+     */
+    public void addBlockChange(
+            ChangedBlock change,
+            Player player,
+            int destroyTime,
+            @org.jetbrains.annotations.Nullable EquipmentSlot handUsed,
+            @org.jetbrains.annotations.Nullable ItemStack returnItem
+    ) {
         if (change == null) return;
 
         long pos = BlockPosition.encode(change.getLocation());
-        BlockChangeEntry entry = blocks.computeIfAbsent(pos, k -> new BlockChangeEntry(change));
-        entry.setTempData(player, destroyTime * 20); // Convert seconds to ticks
+        BlockChangeEntry entry = blocks.computeIfAbsent(pos, _ -> new BlockChangeEntry(change));
+
+        // -1 disables temp build auto-removal; block remains until normal rollback.
+        if (destroyTime <= 0) {
+            return;
+        }
+
+        entry.setTempData(player, destroyTime * 20, handUsed, returnItem); // Convert seconds to ticks
 
         // Start ticker if not running
         ensureTempBlockTickerRunning();
@@ -200,12 +240,73 @@ public class FightChangeOptimized {
      * Removes a temp block and optionally returns items to player.
      */
     private void removeTempBlock(BlockChangeEntry entry) {
+        Block block = entry.changedBlock.getLocation().getBlock();
+
         if (entry.tempData.returnItem && entry.tempData.player.isOnline()) {
-            Block block = entry.changedBlock.getLocation().getBlock();
-            entry.tempData.player.getInventory().addItem(block.getDrops().toArray(new org.bukkit.inventory.ItemStack[0]));
+            ItemStack storedItem = getStoredTempBuildItem(block);
+            if (storedItem != null) {
+                giveReturnedItem(entry.tempData.player, storedItem);
+            } else if (entry.tempData.returnItemStack != null) {
+                giveReturnedItem(entry.tempData.player, entry.tempData.returnItemStack.clone());
+            } else {
+                for (ItemStack drop : block.getDrops()) {
+                    giveReturnedItem(entry.tempData.player, drop);
+                }
+            }
         }
 
         entry.changedBlock.reset();
+        BlockUtil.clearMetadata(block, PLACED_IN_FIGHT);
+        BlockUtil.clearMetadata(block, TempBuild.TEMP_BUILD_BLOCK_ITEM);
+    }
+
+    private void giveReturnedItem(Player player, ItemStack drop) {
+        if (player == null || drop == null || drop.getType().isAir()) {
+            return;
+        }
+
+        PlayerUtil.returnItemToCurrentSlotOrInventory(player, drop);
+    }
+
+    private @org.jetbrains.annotations.Nullable ItemStack getStoredTempBuildItem(@org.jetbrains.annotations.NotNull Block block) {
+        ItemStack storedItem = BlockUtil.getMetadata(block, TempBuild.TEMP_BUILD_BLOCK_ITEM, ItemStack.class);
+        if (storedItem == null || storedItem.getType().isAir()) {
+            return null;
+        }
+
+        ItemStack clone = storedItem.clone();
+        clone.setAmount(1);
+        return clone;
+    }
+
+    private static boolean isVineLike(org.bukkit.Material material) {
+        String name = material.name();
+        return name.equals("VINE") || name.contains("_VINE") || name.contains("_VINES");
+    }
+
+    private static int rollbackPriority(BlockChangeEntry entry) {
+        return isVineLike(entry.getChangedBlock().getMaterial()) ? 1 : 0;
+    }
+
+    private static java.util.Comparator<Map.Entry<Long, BlockChangeEntry>> rollbackComparator() {
+        return (a, b) -> {
+            int pa = rollbackPriority(a.getValue());
+            int pb = rollbackPriority(b.getValue());
+            if (pa != pb) {
+                return Integer.compare(pa, pb);
+            }
+
+            int ay = BlockPosition.getY(a.getKey());
+            int by = BlockPosition.getY(b.getKey());
+
+            // Vine-like hanging blocks must be restored from top to bottom.
+            if (pa == 1) {
+                return Integer.compare(by, ay);
+            }
+
+            // Other blocks keep bottom-to-top restore (support first for gravity blocks).
+            return Integer.compare(ay, by);
+        };
     }
 
     /**
@@ -220,6 +321,24 @@ public class FightChangeOptimized {
      * @param maxChange Maximum blocks to change per tick (use ~100)
      */
     public void rollback(int maxCheck, int maxChange) {
+        rollback(maxCheck, maxChange, null);
+    }
+
+    /**
+     * Same as {@link #rollback(int, int)} but fires {@code onComplete} on the main
+     * thread once every block has been restored.  Pass {@code null} to skip the callback.
+     *
+     * @param maxCheck   Maximum blocks to inspect per tick  (~300)
+     * @param maxChange  Maximum blocks to restore per tick  (~100)
+     * @param onComplete Called on the main thread when rollback finishes, or {@code null}
+     */
+    public void rollback(int maxCheck, int maxChange, @org.jetbrains.annotations.Nullable Runnable onComplete) {
+        rollingBack = true;
+
+        if (ZonePractice.getInstance().isEnabled()) {
+            addRollbackChunkTickets();
+        }
+
         // Remove all entities (both tracked and cuboid entities in one pass)
         removeAllEntities();
 
@@ -229,59 +348,121 @@ public class FightChangeOptimized {
             tempBlockTicker = null;
         }
 
-        if (blocks.isEmpty()) return;
+        if (blocks.isEmpty()) {
+            // Nothing to restore — still extinguish any lingering fire
+            extinguishFire();
+            rollingBack = false;
+            removeRollbackChunkTickets();
+            if (onComplete != null) {
+                if (org.bukkit.Bukkit.isPrimaryThread()) {
+                    onComplete.run();
+                } else {
+                    org.bukkit.Bukkit.getScheduler().runTask(ZonePractice.getInstance(), onComplete);
+                }
+            }
+            return;
+        }
 
         // Quick rollback if server is shutting down
         if (!ZonePractice.getInstance().isEnabled()) {
             quickRollback();
+            extinguishFire();
+            rollingBack = false;
+            removeRollbackChunkTickets();
+            if (onComplete != null) onComplete.run();
             return;
         }
 
         // Cancel existing rollback if running
         if (rollbackTask != null && rollbackTask.isRunning) {
             rollbackTask.cancel();
+            removeRollbackChunkTickets();
         }
 
         // Start new rollback task
-        rollbackTask = new RollbackTask(maxCheck, maxChange);
+        rollbackTask = new RollbackTask(maxCheck, maxChange, onComplete);
         rollbackTask.start();
     }
 
     /**
      * Removes all entities efficiently.
      * Strategy: Remove tracked entities first, then cleanup any remaining cuboid entities.
-     * NOTE: Skips hologram armor stands (invisible with custom name visible) to prevent
+     * NOTE: Skips hologram text displays to prevent
      * leaderboard holograms from disappearing when matches end.
      */
     private void removeAllEntities() {
         // Remove tracked entities (fast - cached references)
         for (Entity entity : trackedEntities) {
             if (entity != null && entity.isValid()) {
-                // Skip hologram armor stands
-                if (isHologramArmorStand(entity)) continue;
+                // Skip hologram text displays
+                if (isHologramTextDisplay(entity)) continue;
+                BlockUtil.clearAllMetadata(entity);
                 entity.remove();
             }
         }
         trackedEntities.clear();
 
-        // Also cleanup any remaining entities in cuboid (comprehensive)
-        // This catches any entities that weren't tracked
-        for (Entity entity : cuboid.getEntities()) {
-            if (entity instanceof Player) continue;
-            // Skip hologram armor stands
-            if (isHologramArmorStand(entity)) continue;
-            if (entity.isValid()) {
-                entity.remove();
+        // Also cleanup any remaining entities in every arena chunk.
+        // We load chunks here so non-living entities in currently-unloaded chunks
+        // (e.g. minecarts/end crystals) cannot leak into the next match.
+        int minChunkX = cuboid.getLowerX() >> 4;
+        int maxChunkX = cuboid.getUpperX() >> 4;
+        int minChunkZ = cuboid.getLowerZ() >> 4;
+        int maxChunkZ = cuboid.getUpperZ() >> 4;
+
+        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
+            for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+                org.bukkit.Chunk chunk = world.getChunkAt(cx, cz);
+                for (Entity entity : chunk.getEntities()) {
+                    if (entity instanceof Player) continue;
+                    if (isHologramTextDisplay(entity)) continue;
+                    if (entity.isValid()) {
+                        BlockUtil.clearAllMetadata(entity);
+                        entity.remove();
+                    }
+                }
             }
         }
     }
 
+    private void addRollbackChunkTickets() {
+        org.bukkit.plugin.Plugin plugin = ZonePractice.getInstance();
+        if (!plugin.isEnabled()) {
+            return;
+        }
+        int minChunkX = cuboid.getLowerX() >> 4;
+        int maxChunkX = cuboid.getUpperX() >> 4;
+        int minChunkZ = cuboid.getLowerZ() >> 4;
+        int maxChunkZ = cuboid.getUpperZ() >> 4;
+
+        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
+            for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+                world.addPluginChunkTicket(cx, cz, plugin);
+                rollbackChunkTickets.add((((long) cx) << 32) | (cz & 0xFFFFFFFFL));
+            }
+        }
+    }
+
+    private void removeRollbackChunkTickets() {
+        org.bukkit.plugin.Plugin plugin = ZonePractice.getInstance();
+        if (!plugin.isEnabled()) {
+            rollbackChunkTickets.clear();
+            return;
+        }
+        for (Long chunkKey : rollbackChunkTickets) {
+            int cx = (int) (chunkKey >> 32);
+            int cz = (int) (long) chunkKey;
+            world.removePluginChunkTicket(cx, cz, plugin);
+        }
+        rollbackChunkTickets.clear();
+    }
+
     /**
-     * Checks if an entity is a hologram armor stand.
-     * Delegates to ArmorStandFactory for consistent detection.
+     * Checks if an entity is a hologram text display.
+     * Delegates to TextDisplayFactory for consistent detection.
      */
-    private boolean isHologramArmorStand(Entity entity) {
-        return dev.nandi0813.practice.manager.leaderboard.hologram.ArmorStandFactory.isHologramArmorStand(entity);
+    private boolean isHologramTextDisplay(Entity entity) {
+        return dev.nandi0813.practice.manager.leaderboard.hologram.TextDisplayFactory.isHologramTextDisplay(entity);
     }
 
     /**
@@ -289,16 +470,34 @@ public class FightChangeOptimized {
      * Used when server is shutting down.
      */
     public void quickRollback() {
-        Iterator<Map.Entry<Long, BlockChangeEntry>> iterator = blocks.entrySet().iterator();
+        List<Map.Entry<Long, BlockChangeEntry>> sorted = new ArrayList<>(blocks.entrySet());
+        sorted.sort(rollbackComparator());
 
-        while (iterator.hasNext()) {
-            Map.Entry<Long, BlockChangeEntry> entry = iterator.next();
+        for (Map.Entry<Long, BlockChangeEntry> entry : sorted) {
             entry.getValue().changedBlock.reset();
 
             Block block = BlockPosition.getBlock(world, entry.getKey());
-            block.removeMetadata(PLACED_IN_FIGHT, ZonePractice.getInstance());
+            // PLACED_IN_FIGHT uses PersistentTagUtil, so clear through BlockUtil.
+            BlockUtil.clearMetadata(block, PLACED_IN_FIGHT);
+            blocks.remove(entry.getKey());
+        }
+    }
 
-            iterator.remove();
+    /**
+     * Scans the arena cuboid and extinguishes any remaining fire (FIRE / SOUL_FIRE) blocks.
+     * <p>
+     * During multi-tick rollback, fire can spread to freshly-restored flammable blocks
+     * before the rollback finishes. This sweep ensures no fire persists after rollback.
+     */
+    private void extinguishFire() {
+        if (cuboid == null) return;
+
+        for (Block block : cuboid) {
+            String typeName = block.getType().name();
+            if (typeName.equals("FIRE") || typeName.equals("SOUL_FIRE")) {
+                block.setBlockData(org.bukkit.Material.AIR.createBlockData(), false);
+                BlockUtil.clearMetadata(block, PLACED_IN_FIGHT);
+            }
         }
     }
 
@@ -309,6 +508,11 @@ public class FightChangeOptimized {
      * - Chunk-aware: Skips blocks in unloaded chunks
      * - Progress tracking: Logs completion metrics
      * - Memory efficient: Removes entries during iteration
+     * <p>
+     * ORDER: Entries are sorted bottom-to-top (ascending Y) so that support blocks are
+     * always restored before gravity-affected blocks (sand, gravel, etc.) above them.
+     * Without this, a sand block restored at Y=70 would immediately fall because the
+     * block at Y=69 hasn't been restored yet.
      */
     private class RollbackTask extends BukkitRunnable {
         private final Iterator<Map.Entry<Long, BlockChangeEntry>> iterator;
@@ -316,15 +520,20 @@ public class FightChangeOptimized {
         private final int maxChange;
         private final int totalBlocks;
         private int processedBlocks = 0;
-        private final long startTime;
         private boolean isRunning = false;
+        @org.jetbrains.annotations.Nullable
+        private final Runnable onComplete;
 
-        RollbackTask(int maxCheck, int maxChange) {
-            this.iterator = blocks.entrySet().iterator();
+        RollbackTask(int maxCheck, int maxChange, @org.jetbrains.annotations.Nullable Runnable onComplete) {
+            // Default ordering is bottom-up (gravity support). Vine-like blocks are
+            // restored top-down so hanging segments do not immediately break.
+            List<Map.Entry<Long, BlockChangeEntry>> sorted = new ArrayList<>(blocks.entrySet());
+            sorted.sort(rollbackComparator());
+            this.iterator = sorted.iterator();
             this.maxCheck = maxCheck;
             this.maxChange = maxChange;
             this.totalBlocks = blocks.size();
-            this.startTime = System.currentTimeMillis();
+            this.onComplete = onComplete;
         }
 
         void start() {
@@ -336,7 +545,6 @@ public class FightChangeOptimized {
         public void run() {
             int changeCounter = 0;
             int checkCounter = 0;
-            int skippedUnloaded = 0;
 
             try {
                 while (iterator.hasNext() && changeCounter < maxChange && checkCounter < maxCheck) {
@@ -346,14 +554,12 @@ public class FightChangeOptimized {
 
                     checkCounter++;
 
-                    // OPTIMIZATION: Skip blocks in unloaded chunks (prevents lag)
+                    // Ensure the chunk is loaded before restoring this block.
                     int chunkX = BlockPosition.getX(pos) >> 4;
                     int chunkZ = BlockPosition.getZ(pos) >> 4;
 
                     if (!world.isChunkLoaded(chunkX, chunkZ)) {
-                        skippedUnloaded++;
-                        iterator.remove(); // Remove anyway - arena should be loaded
-                        continue;
+                        world.getChunkAt(chunkX, chunkZ);
                     }
 
                     changeCounter++;
@@ -362,9 +568,10 @@ public class FightChangeOptimized {
                     blockEntry.changedBlock.reset();
 
                     Block block = BlockPosition.getBlock(world, pos);
-                    block.removeMetadata(PLACED_IN_FIGHT, ZonePractice.getInstance());
+                    // PLACED_IN_FIGHT uses PersistentTagUtil, so clear through BlockUtil.
+                    BlockUtil.clearMetadata(block, PLACED_IN_FIGHT);
 
-                    iterator.remove();
+                    blocks.remove(pos); // Remove from live map
                 }
 
                 // Finished rolling back all blocks
@@ -372,6 +579,15 @@ public class FightChangeOptimized {
                     this.cancel();
                     isRunning = false;
                     blocks.clear(); // Clear the map
+
+                    // Extinguish any fire that spread during the multi-tick rollback
+                    extinguishFire();
+                    rollingBack = false;
+                    removeRollbackChunkTickets();
+
+                    if (onComplete != null) {
+                        onComplete.run(); // already on main thread (runTaskTimer)
+                    }
 
                     /*
                     // Log completion metrics
@@ -385,8 +601,9 @@ public class FightChangeOptimized {
             } catch (Exception e) {
                 this.cancel();
                 isRunning = false;
+                rollingBack = false;
+                removeRollbackChunkTickets();
                 Common.sendConsoleMMMessage("<red>Rollback error at block " + processedBlocks + "/" + totalBlocks + ": " + e.getMessage());
-                e.printStackTrace();
             }
         }
     }
@@ -404,8 +621,13 @@ public class FightChangeOptimized {
             this.changedBlock = changedBlock;
         }
 
-        void setTempData(Player player, int ticksRemaining) {
-            this.tempData = new TempBlockData(player, ticksRemaining);
+        void setTempData(
+                Player player,
+                int ticksRemaining,
+                @org.jetbrains.annotations.Nullable EquipmentSlot handUsed,
+                @org.jetbrains.annotations.Nullable ItemStack returnItem
+        ) {
+            this.tempData = new TempBlockData(player, ticksRemaining, handUsed, returnItem);
         }
 
     }
@@ -416,24 +638,48 @@ public class FightChangeOptimized {
     public static class TempBlockData {
         @Getter
         final Player player;
+        @Getter
+        @org.jetbrains.annotations.Nullable
+        final EquipmentSlot handUsed;
+        @org.jetbrains.annotations.Nullable
+        final ItemStack returnItemStack;
         int ticksRemaining;
         @Setter
         boolean returnItem = true;
 
-        TempBlockData(Player player, int ticksRemaining) {
+        TempBlockData(
+                Player player,
+                int ticksRemaining,
+                @org.jetbrains.annotations.Nullable EquipmentSlot handUsed,
+                @org.jetbrains.annotations.Nullable ItemStack returnItem
+        ) {
             this.player = player;
             this.ticksRemaining = ticksRemaining;
+            this.handUsed = handUsed;
+            this.returnItemStack = returnItem == null ? null : returnItem.clone();
         }
 
         /**
          * Resets the temp block (removes it).
          */
         public void reset(FightChangeOptimized fightChange, ChangedBlock changedBlock, long position) {
+            Block block = changedBlock.getLocation().getBlock();
+
             if (returnItem && player.isOnline()) {
-                Block block = changedBlock.getLocation().getBlock();
-                player.getInventory().addItem(block.getDrops().toArray(new org.bukkit.inventory.ItemStack[0]));
+                ItemStack storedItem = fightChange.getStoredTempBuildItem(block);
+                if (storedItem != null) {
+                    fightChange.giveReturnedItem(player, storedItem);
+                } else if (returnItemStack != null) {
+                    fightChange.giveReturnedItem(player, returnItemStack.clone());
+                } else {
+                    for (ItemStack drop : block.getDrops()) {
+                        fightChange.giveReturnedItem(player, drop);
+                    }
+                }
             }
             changedBlock.reset();
+            BlockUtil.clearMetadata(block, PLACED_IN_FIGHT);
+            BlockUtil.clearMetadata(block, TempBuild.TEMP_BUILD_BLOCK_ITEM);
             fightChange.getBlocks().remove(position);
         }
     }

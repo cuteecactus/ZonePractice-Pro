@@ -15,6 +15,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.List;
+
 public class DivisionGui extends GUI {
 
     private static final ItemStack BACK_TO_ITEM = GUIFile.getGuiItem("GUIS.DIVISION.ICONS.BACK-TO").get();
@@ -83,11 +85,17 @@ public class DivisionGui extends GUI {
     private ItemStack getDivisionItem(final Division division) {
         GUIItem guiItem;
 
-        if (division == profile.getStats().getDivision()) {
+        List<Division> divisions = DivisionManager.getInstance().getDivisions();
+        Division currentDivision = profile.getStats().getDivision();
+        Division minDivisionForRanked = DivisionManager.getInstance().getMinimumForRanked();
+        int divisionIndex = divisions.indexOf(division);
+        int currentIndex = currentDivision != null ? divisions.indexOf(currentDivision) : -1;
+
+        if (division == currentDivision) {
             guiItem = CURRENT_DIVISION_ITEM.cloneItem();
             guiItem.replace("%progress_bar%", StatisticUtil.getProgressBar(100.0));
             guiItem.replace("%progress_percent%", "100.0");
-        } else if (division.getExperience() < profile.getStats().getExperience() && division.getWin() < profile.getStats().getGlobalWins()) {
+        } else if (currentDivision != null && divisionIndex < currentIndex) {
             guiItem = PAST_DIVISION_ITEM.cloneItem();
             guiItem.replace("%progress_bar%", StatisticUtil.getProgressBar(100.0));
             guiItem.replace("%progress_percent%", "100.0");
@@ -110,6 +118,13 @@ public class DivisionGui extends GUI {
             guiItem.setDamage(division.getIconDamage());
 
         guiItem = replacePlaceholders(guiItem, division);
+
+        // Add ranked requirement indicator
+        if (division == minDivisionForRanked) {
+            guiItem.replace("%is_ranked_requirement%", "<green>✓ <green>Unlocks Ranked");
+        } else {
+            guiItem.replace("%is_ranked_requirement%", "");
+        }
 
         return guiItem.get();
     }

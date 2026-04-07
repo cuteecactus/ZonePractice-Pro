@@ -1,4 +1,4 @@
-VERSION: 1
+VERSION: 4
 #
 # Player Group settings
 #
@@ -11,67 +11,77 @@ GROUPS:
     UNRANKED-PER-DAY: 20
     RANKED-PER-DAY: 10
     EVENT-START-PER-DAY: 0
+    PARTY-BROADCAST-PER-DAY: 0
+    PARTY-MEMBER-LIMIT: 6
     CUSTOM-KIT: 1
     MODIFIABLE-KIT-PER-LADDER: 1
     LOBBY-NAMETAG:
       PREFIX: "%division_short% <dark_gray>|<gray> "
-      NAME-COLOR: GRAY
+      NAME: "<gradient:green:blue>%player%</gradient>"
       SUFFIX: ""
       SORT-PRIORITY: 4
-    CHAT-FORMAT: "%%division%% <dark_gray>| <gray>%%player%%: <white>%%message%%" # You can delete this line in groups, they just get the default server-chat format.
+    CHAT-FORMAT: "%%player%%: <white>%%message%%" # You can delete this line in groups, they just get the default server-chat format.
   PREMIUM:
     NAME: "<red>Premium"
     WEIGHT: 1
     UNRANKED-PER-DAY: 50
     RANKED-PER-DAY: 30
     EVENT-START-PER-DAY: 1
+    PARTY-BROADCAST-PER-DAY: 1
+    PARTY-MEMBER-LIMIT: 10
     CUSTOM-KIT: 2
     MODIFIABLE-KIT-PER-LADDER: 2
     LOBBY-NAMETAG:
       PREFIX: "%division_short% <dark_gray>| "
-      NAME-COLOR: GRAY
+      NAME: "<gradient:green:blue>%player%</gradient>"
       SUFFIX: " <dark_gray>[<red>Premium<dark_gray>]<gray>"
       SORT-PRIORITY: 3
-    CHAT-FORMAT: "%%division%% <dark_gray>| <dark_gray>[<red>Premium<dark_gray>] <gray>%%player%%: <white>%%message%%"
+    CHAT-FORMAT: "%%player%%: <white>%%message%%"
   SUPREME:
     NAME: "<gold>Supreme"
     WEIGHT: 2
     UNRANKED-PER-DAY: 100
     RANKED-PER-DAY: 50
     EVENT-START-PER-DAY: 2
+    PARTY-BROADCAST-PER-DAY: 3
+    PARTY-MEMBER-LIMIT: 14
     CUSTOM-KIT: 3
     MODIFIABLE-KIT-PER-LADDER: 4
     LOBBY-NAMETAG:
       PREFIX: "%division_short% <dark_gray>| "
-      NAME-COLOR: GRAY
+      NAME: "<gray>%player%"
       SUFFIX: " <dark_gray>[<gold>Supreme<dark_gray>]<gray>"
       SORT-PRIORITY: 2
-    CHAT-FORMAT: "%%division%% <dark_gray>| <dark_gray>[<gold>Supreme<dark_gray>] <gray>%%player%%: <white>%%message%%"
+    CHAT-FORMAT: "%%player%%: <white>%%message%%"
   STAFF:
     NAME: "<green>Staff"
     WEIGHT: 3
     UNRANKED-PER-DAY: 0
     RANKED-PER-DAY: 0
     EVENT-START-PER-DAY: 3
+    PARTY-BROADCAST-PER-DAY: 5
+    PARTY-MEMBER-LIMIT: 20
     CUSTOM-KIT: 0
     MODIFIABLE-KIT-PER-LADDER: 0
     LOBBY-NAMETAG:
       PREFIX: "<dark_gray>[<green>Staff<dark_gray>]<gray> "
-      NAME-COLOR: GRAY
+      NAME: "<gray>%player%"
       SUFFIX: ""
       SORT-PRIORITY: 1
-    CHAT-FORMAT: "%%division%% <dark_gray>| <dark_gray>[<green>Staff<dark_gray>] <gray>%%player%%: <white>%%message%%"
+    CHAT-FORMAT: "%%player%%: <white>%%message%%"
   ADMIN:
     NAME: "<light_purple>Admin"
     WEIGHT: 4
     UNRANKED-PER-DAY: 500
     RANKED-PER-DAY: 100
     EVENT-START-PER-DAY: 100
+    PARTY-BROADCAST-PER-DAY: 100
+    PARTY-MEMBER-LIMIT: 25
     CUSTOM-KIT: 5 # Maximum 5
     MODIFIABLE-KIT-PER-LADDER: 4
     LOBBY-NAMETAG:
       PREFIX: "<dark_gray>[<light_purple>Admin<dark_gray>]<gray> "
-      NAME-COLOR: GRAY
+      NAME: "<gray>%player%"
       SUFFIX: ""
       SORT-PRIORITY: 0
-    CHAT-FORMAT: "%%division%% <dark_gray>| <dark_gray>[<light_purple>Admin<dark_gray>] <gray> <gray>%%player%%: <white>%%message%%"
+    CHAT-FORMAT: "%%player%%: <white>%%message%%"

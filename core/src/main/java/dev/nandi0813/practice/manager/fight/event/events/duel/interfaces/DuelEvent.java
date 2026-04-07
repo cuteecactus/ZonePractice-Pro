@@ -4,12 +4,16 @@ import dev.nandi0813.api.Event.Event.EventEndEvent;
 import dev.nandi0813.api.Event.Spectate.Start.EventSpectateStartEvent;
 import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
+import dev.nandi0813.practice.manager.fight.event.EventManager;
 import dev.nandi0813.practice.manager.fight.event.enums.EventStatus;
 import dev.nandi0813.practice.manager.fight.event.interfaces.Event;
 import dev.nandi0813.practice.manager.fight.event.runnables.DurationRunnable;
 import dev.nandi0813.practice.manager.fight.event.runnables.StartRunnable;
 import dev.nandi0813.practice.manager.fight.event.util.EventUtil;
 import dev.nandi0813.practice.manager.server.ServerManager;
+import dev.nandi0813.practice.manager.server.sound.SoundEffect;
+import dev.nandi0813.practice.manager.server.sound.SoundManager;
+import dev.nandi0813.practice.manager.server.sound.SoundType;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.entityhider.PlayerHider;
 import dev.nandi0813.practice.util.playerutil.PlayerUtil;
@@ -110,20 +114,50 @@ public abstract class DuelEvent extends Event {
         int seconds = startRunnable.getSeconds();
 
         if (seconds == 0) {
+            this.sendEventStartFightTitle();
             startRunnable.cancel();
 
             this.getDurationRunnable().begin();
             this.status = EventStatus.LIVE;
         } else {
+            int titleCountdownFrom = dev.nandi0813.practice.manager.backend.ConfigManager.getInt("MATCH-SETTINGS.TITLE.START-COUNTDOWN-FROM", 5);
+            if (seconds <= titleCountdownFrom) {
+                this.sendEventStartCountdownTitle(seconds);
+            }
+
             if (seconds <= 5) {
                 this.sendMessage(LanguageManager.getString(LANGUAGE_PATH + ".ROUND-STARTING")
                                 .replace("%seconds%", String.valueOf(seconds))
                                 .replace("%secondName%", (seconds == 1 ? LanguageManager.getString("SECOND-NAME.1SEC") : LanguageManager.getString("SECOND-NAME.1<SEC"))),
                         true);
+
+                SoundEffect sound = SoundManager.getInstance().getSound(SoundType.EVENT_START_COUNTDOWN);
+                if (sound != null) sound.play(this.getPlayers());
             }
 
             startRunnable.decreaseTime();
         }
+    }
+
+    private void sendEventStartCountdownTitle(int seconds) {
+        String countdownTitle = LanguageManager.getString("MATCH.START-TITLES.COUNTDOWN").replace("%remaining%", String.valueOf(seconds));
+        for (Player recipient : this.getTitleRecipients()) {
+            EventManager.getInstance().sendRawEventTitle(recipient, countdownTitle, "");
+        }
+    }
+
+    private void sendEventStartFightTitle() {
+        String fightTitle = LanguageManager.getString("MATCH.START-TITLES.FIGHT");
+        for (Player recipient : this.getTitleRecipients()) {
+            EventManager.getInstance().sendRawEventTitle(recipient, fightTitle, "");
+        }
+    }
+
+    private List<Player> getTitleRecipients() {
+        Set<Player> recipients = new LinkedHashSet<>();
+        recipients.addAll(this.players);
+        recipients.addAll(this.getSpectators());
+        return new ArrayList<>(recipients);
     }
 
     @Override
@@ -167,6 +201,10 @@ public abstract class DuelEvent extends Event {
 
     @Override
     public void endEvent() {
+        if (this.status.equals(EventStatus.END)) {
+            return;
+        }
+
         EventEndEvent event = new EventEndEvent(this);
         Bukkit.getPluginManager().callEvent(event);
 
@@ -180,6 +218,7 @@ public abstract class DuelEvent extends Event {
         }
 
         if (this.winner != null) {
+
             this.sendMessage(LanguageManager.getString(LANGUAGE_PATH + ".WON-EVENT").replace("%winner%", this.winner.getName()), true);
 
             for (String cmd : this.eventData.getType().getWinnerCMD()) {

@@ -1,0 +1,790 @@
+VERSION: 4
+
+GUI:
+  MAIN:
+    TITLE: "&8%name%"
+    ICONS:
+      BACK-TO:
+        NAME: "&7&lBack"
+        MATERIAL: ARROW
+        LORE:
+          - "&7Click to go back"
+      CUSTOM-SETTINGS:
+        NAME: "&bCustom Settings"
+        MATERIAL: COMPARATOR
+      GUIDE:
+        NAME: "&b&lGuide"
+        MATERIAL: PAPER
+        LORE:
+          - "&fLeft click to change item"
+          - "&fShit left click to remove item"
+          - "&fRight click to enchant or change count"
+          - "&fShift right click to copy or paste item"
+      RESET-KIT:
+        NAME: "&cReset Kit"
+        MATERIAL: GUNPOWDER
+      CHANGE-NAME:
+        NAME: "&bChange the name of kit"
+        MATERIAL: NAME_TAG
+      SHARE-KIT:
+        NAME: "&bShare Kit"
+        MATERIAL: OAK_SIGN
+      KIT-SLOT-PLACEHOLDERS:
+        HEAD:
+          NAME: "&7Head"
+          MATERIAL: BLUE_STAINED_GLASS_PANE
+          LORE:
+            - "&3Click to add"
+        CHEST:
+          NAME: "&7Chest"
+          MATERIAL: BLUE_STAINED_GLASS_PANE
+          LORE:
+            - "&3Click to add"
+        LEGS:
+          NAME: "&7Legs"
+          MATERIAL: BLUE_STAINED_GLASS_PANE
+          LORE:
+            - "&3Click to add"
+        BOOTS:
+          NAME: "&7Feet"
+          MATERIAL: BLUE_STAINED_GLASS_PANE
+          LORE:
+            - "&3Click to add"
+        OFFHAND:
+          NAME: "&7Offhand"
+          MATERIAL: BLUE_STAINED_GLASS_PANE
+          LORE:
+            - "&3Click to add"
+        HOTBAR:
+          NAME: "&7None"
+          MATERIAL: LIGHT_BLUE_STAINED_GLASS_PANE
+          LORE:
+            - "&3Click to add"
+        OTHER-INVENTORY:
+          NAME: "&7None"
+          MATERIAL: GRAY_STAINED_GLASS_PANE
+          LORE:
+              - "&3Click to add"
+  MAIN-ARMOR:
+    TITLE: "&8Armor"
+    SIZE: 6
+    ICONS:
+      OFFICIAL:
+        BACK-TO:
+          NAME: "&7&lBack"
+          MATERIAL: ARROW
+          SLOT: 45
+          LORE:
+            - "&7Click to go back"
+        NONE:
+          NAME: "&7None"
+          SLOT: 18
+          MATERIAL: GRAY_STAINED_GLASS_PANE
+      HELMETS:
+        LEATHER:
+          MATERIAL: LEATHER_HELMET
+          SLOT: 19
+        GOLD:
+          MATERIAL: GOLDEN_HELMET
+          SLOT: 20
+        CHAIN:
+          MATERIAL: CHAINMAIL_HELMET
+          SLOT: 21
+        TURTLE:
+          MATERIAL: TURTLE_HELMET
+          SLOT: 22
+        IRON:
+          MATERIAL: IRON_HELMET
+          SLOT: 23
+        DIAMOND:
+          MATERIAL: DIAMOND_HELMET
+          SLOT: 24
+        NETHERITE:
+          MATERIAL: NETHERITE_HELMET
+          SLOT: 25
+        PUMPKIN:
+          MATERIAL: CARVED_PUMPKIN
+          SLOT: 26
+      CHESTPLATES:
+        LEATHER:
+          MATERIAL: LEATHER_CHESTPLATE
+          SLOT: 19
+        GOLD:
+          MATERIAL: GOLDEN_CHESTPLATE
+          SLOT: 20
+        CHAIN:
+          MATERIAL: CHAINMAIL_CHESTPLATE
+          SLOT: 21
+        IRON:
+          MATERIAL: IRON_CHESTPLATE
+          SLOT: 22
+        DIAMOND:
+          MATERIAL: DIAMOND_CHESTPLATE
+          SLOT: 23
+        NETHERITE:
+          MATERIAL: NETHERITE_CHESTPLATE
+          SLOT: 24
+        ELYTRA:
+          MATERIAL: ELYTRA
+          SLOT: 25
+      LEGGINGS:
+        LEATHER:
+          MATERIAL: LEATHER_LEGGINGS
+          SLOT: 19
+        GOLD:
+          MATERIAL: GOLDEN_LEGGINGS
+          SLOT: 20
+        CHAIN:
+          MATERIAL: CHAINMAIL_LEGGINGS
+          SLOT: 21
+        IRON:
+          MATERIAL: IRON_LEGGINGS
+          SLOT: 22
+        DIAMOND:
+          MATERIAL: DIAMOND_LEGGINGS
+          SLOT: 23
+        NETHERITE:
+          MATERIAL: NETHERITE_LEGGINGS
+          SLOT: 24
+      BOOTS:
+        LEATHER:
+          MATERIAL: LEATHER_BOOTS
+          SLOT: 19
+        GOLD:
+          MATERIAL: GOLDEN_BOOTS
+          SLOT: 20
+        CHAIN:
+          MATERIAL: CHAINMAIL_BOOTS
+          SLOT: 21
+        IRON:
+          MATERIAL: IRON_BOOTS
+          SLOT: 22
+        DIAMOND:
+          MATERIAL: DIAMOND_BOOTS
+          SLOT: 23
+        NETHERITE:
+          MATERIAL: NETHERITE_BOOTS
+          SLOT: 24
+  CUSTOM-SETTINGS:
+    TITLE: "&8Settings"
+    ICONS:
+      NAV:
+        GO-BACK:
+          NAME: "&cGo Back"
+          MATERIAL: ARROW
+      NORMAL-SETTINGS:
+        REGENERATION:
+          ENABLED:
+            NAME: "&7Regeneration: &aEnabled"
+            MATERIAL: GLOWSTONE_DUST
+            LORE:
+              - ""
+              - "&7Players health is automatically regenerate."
+              - ""
+              - "&e&lClick here &7to &cdisable&7."
+          DISABLED:
+            NAME: "&7Regeneration: &cDisabled"
+            MATERIAL: GLOWSTONE_DUST
+            LORE:
+              - ""
+              - "&7Players health is not regenerate."
+              - ""
+              - "&e&lClick here &7to &aenable&7."
+        HUNGER:
+          ENABLED:
+            NAME: "&7Hunger: &aEnabled"
+            MATERIAL: COOKED_BEEF
+            LORE:
+              - ""
+              - "&7Players starve during the game."
+              - ""
+              - "&e&lClick here &7to &cdisable&7."
+          DISABLED:
+            NAME: "&7Hunger: &cDisabled"
+            MATERIAL: COOKED_BEEF
+            LORE:
+              - ""
+              - "&7Players don't starve."
+              - ""
+              - "&e&lClick here &7to &aenable&7."
+        BUILD:
+          ENABLED:
+            NAME: "&7Build: &aEnabled"
+            MATERIAL: DIAMOND_PICKAXE
+            LORE:
+              - ""
+              - "&7Players can build during the game."
+              - ""
+              - "&e&lClick here &7to &cdisable&7."
+          DISABLED:
+            NAME: "&7Build: &cDisabled"
+            MATERIAL: DIAMOND_PICKAXE
+            LORE:
+              - ""
+              - "&7Players can't build."
+              - ""
+              - "&e&lClick here &7to &aenable&7."
+        ROUNDS:
+          NAME: "&7Rounds: &6%rounds%"
+          MATERIAL: FIRE_CHARGE
+          LORE:
+            - ""
+            - "&7The first player/team to reach"
+            - "&7the, winning rounds wins."
+            - ""
+            - "&a&lLEFT-CLICK &ato reduce the rounds."
+            - "&b&lRIGHT-CLICK &bto increase the rounds."
+        KNOCKBACK:
+          NAME: "&eKnockback Modifier"
+          MATERIAL: STICK
+          LORE:
+            - ""
+            - "%knockbackTypes%"
+        HITDELAY:
+          NAME: "&7Attack Cooldown: &6%hitdelay%x"
+          MATERIAL: DIAMOND_SWORD
+          LORE:
+            - ""
+            - "&71.0 = Normal speed (20 ticks)"
+            - "&70.5 = 2x faster"
+            - "&72.0 = 2x slower"
+            - ""
+            - "&c&lNote: &71 sec = 20 tick"
+            - ""
+            - "&a&lLEFT-CLICK &ato reduce the rounds."
+            - "&b&lRIGHT-CLICK &bto increase the rounds."
+        ENDERPEARL-COOLDOWN:
+          NAME: "&7EnderPearl Cooldown: &6%epCooldown% sec"
+          MATERIAL: ENDER_PEARL
+          LORE:
+            - ""
+            - "&7Players must wait this long before"
+            - "&7they can throw the next enderpearl."
+            - ""
+            - "&a&lLEFT-CLICK &ato reduce the cooldown."
+            - "&b&lRIGHT-CLICK &bto increase the cooldown."
+        GOLDENAPPLE-COOLDOWN:
+          NAME: "&7Golden Apple Cooldown: &6%gaCooldown%"
+          MATERIAL: GOLDEN_APPLE
+          LORE:
+            - ""
+            - "&7Players must wait this long before"
+            - "&7they can consume the next golden apple."
+            - ""
+            - "&7This setting includes both enchanted"
+            - "&7and non-enchanted golden apples."
+            - ""
+            - "&a&lLEFT-CLICK &ato reduce the cooldown."
+            - "&b&lRIGHT-CLICK &bto increase the cooldown."
+        WIND-CHARGE-COOLDOWN:
+          NAME: "&7Wind Charge Cooldown: &6%windChargeCooldown% sec"
+          MATERIAL: WIND_CHARGE
+          LORE:
+            - ""
+            - "&7Players must wait this long before"
+            - "&7they can launch the next wind charge."
+            - ""
+            - "&a&lLEFT-CLICK &ato reduce the cooldown."
+            - "&b&lRIGHT-CLICK &bto increase the cooldown."
+        HEALTH-BELOW-NAME:
+          ENABLED:
+            NAME: "&7Health Below Name: &aEnabled"
+            MATERIAL: RED_DYE
+            LORE:
+              - ""
+              - "&7Players will display their hearts"
+              - "&7during the match."
+              - ""
+              - "&e&lClick here &7to &cdisable&7."
+          DISABLED:
+            NAME: "&7Health Below Name: &cDisabled"
+            MATERIAL: RED_DYE
+            LORE:
+              - ""
+              - "&7Players will display their hearts"
+              - "&7during the match."
+              - ""
+              - "&e&lClick here &7to &aenable&7."
+  ITEMS:
+    CATEGORY-GUI:
+      TITLE: "&8Item categories"
+      SIZE: 6
+      ICONS:
+        BACK-TO:
+          NAME: "&7&lBack"
+          MATERIAL: ARROW
+          SLOT: 45
+          LORE:
+            - "&7Click to go back"
+        NONE:
+          NAME: "&bNone"
+          MATERIAL: GRAY_STAINED_GLASS_PANE
+          SLOT: 18
+        ARMOR:
+          NAME: "&bArmor"
+          MATERIAL: DIAMOND_CHESTPLATE
+          SLOT: 19
+        WEAPONS-TOOLS:
+          NAME: "&bWeapons & Tools"
+          MATERIAL: IRON_SWORD
+          SLOT: 20
+        BOWS-ARROWS:
+          NAME: "&bBows & Arrows"
+          MATERIAL: BOW
+          SLOT: 21
+        POTIONS:
+          NAME: "&bPotions"
+          MATERIAL: POTION
+          SLOT: 22
+        SHULKER-BOXES:
+          NAME: "&bShulker Boxes"
+          MATERIAL: PURPLE_SHULKER_BOX
+          SLOT: 32
+        # ── Custom categories ──────────────────────────────────────────────────
+        # Any key added here (that isn't a built-in) becomes a custom category.
+        # Add a matching entry under ITEMS-GUI.CATEGORIES with TITLE and ITEMS.
+        FOOD:
+          NAME: "&bFood"
+          MATERIAL: COOKED_BEEF
+          SLOT: 23
+        BLOCKS:
+          NAME: "&bBlocks"
+          MATERIAL: COBBLESTONE
+          SLOT: 24
+    ITEMS-GUI:
+      SIZE: 6
+      OFFICIAL-ICONS:
+        BACK-TO:
+          NAME: "&7&lBack"
+          MATERIAL: ARROW
+          LORE:
+            - "&7Click to go back"
+        NEXT-PAGE:
+          NAME: "&7&lNext Page"
+          MATERIAL: ARROW
+          LORE:
+              - "&7Click"
+        PREVIOUS-PAGE:
+          NAME: "&7&lPrevious Page"
+          MATERIAL: ARROW
+          LORE:
+              - "&7Click"
+      CATEGORIES:
+        ARMOR:
+          TITLE: "&8Armor"
+          ITEMS:
+            - "LEATHER_HELMET"
+            - "GOLDEN_HELMET"
+            - "CHAINMAIL_HELMET"
+            - "IRON_HELMET"
+            - "DIAMOND_HELMET"
+            - "NETHERITE_HELMET"
+            - "TURTLE_HELMET"
+            - ""
+            - ""
+            - "LEATHER_CHESTPLATE"
+            - "GOLDEN_CHESTPLATE"
+            - "CHAINMAIL_CHESTPLATE"
+            - "IRON_CHESTPLATE"
+            - "DIAMOND_CHESTPLATE"
+            - "NETHERITE_CHESTPLATE"
+            - "ELYTRA"
+            - ""
+            - ""
+            - "LEATHER_LEGGINGS"
+            - "GOLDEN_LEGGINGS"
+            - "CHAINMAIL_LEGGINGS"
+            - "IRON_LEGGINGS"
+            - "DIAMOND_LEGGINGS"
+            - "NETHERITE_LEGGINGS"
+            - ""
+            - ""
+            - ""
+            - "LEATHER_BOOTS"
+            - "GOLDEN_BOOTS"
+            - "CHAINMAIL_BOOTS"
+            - "IRON_BOOTS"
+            - "DIAMOND_BOOTS"
+            - "NETHERITE_BOOTS"
+        WEAPONS-TOOLS:
+          TITLE: "&8Weapons and Tools"
+          ITEMS:
+            - "WOODEN_SWORD"
+            - "GOLDEN_SWORD"
+            - "STONE_SWORD"
+            - "IRON_SWORD"
+            - "DIAMOND_SWORD"
+            - "NETHERITE_SWORD"
+            - "SHIELD"
+            - "TRIDENT"
+            - "TOTEM_OF_UNDYING"
+            - "WOODEN_AXE"
+            - "GOLDEN_AXE"
+            - "STONE_AXE"
+            - "IRON_AXE"
+            - "DIAMOND_AXE"
+            - "NETHERITE_AXE"
+            - "FLINT_AND_STEEL"
+            - "SHEARS"
+            - "FISHING_ROD"
+            - "WOODEN_PICKAXE"
+            - "GOLDEN_PICKAXE"
+            - "STONE_PICKAXE"
+            - "IRON_PICKAXE"
+            - "DIAMOND_PICKAXE"
+            - "NETHERITE_PICKAXE"
+            - "BUCKET"
+            - "WATER_BUCKET"
+            - "LAVA_BUCKET"
+            - "WOODEN_SHOVEL"
+            - "GOLDEN_SHOVEL"
+            - "STONE_SHOVEL"
+            - "IRON_SHOVEL"
+            - "DIAMOND_SHOVEL"
+            - "NETHERITE_SHOVEL"
+            - "MILK_BUCKET"
+            - "END_CRYSTAL"
+            - "ENDER_PEARL"
+            - "WOODEN_HOE"
+            - "GOLDEN_HOE"
+            - "STONE_HOE"
+            - "IRON_HOE"
+            - "DIAMOND_HOE"
+            - "WIND_CHARGE"
+            - "EXPERIENCE_BOTTLE"
+            - "SNOWBALL"
+            - "FIREWORK_ROCKET"
+        BOWS-ARROWS:
+          TITLE: "&8Bows and Arrows"
+          ITEMS:
+            - "BOW"
+            - "CROSSBOW"
+            - "ARROW"
+            - "SPECTRAL_ARROW"
+            - "TIPPED_ARROW::NIGHT_VISION"
+            - "TIPPED_ARROW::LONG_NIGHT_VISION"
+            - "TIPPED_ARROW::INVISIBILITY"
+            - "TIPPED_ARROW::LONG_INVISIBILITY"
+            - "TIPPED_ARROW::LEAPING"
+            - "TIPPED_ARROW::LONG_LEAPING"
+            - "TIPPED_ARROW::STRONG_LEAPING"
+            - "TIPPED_ARROW::FIRE_RESISTANCE"
+            - "TIPPED_ARROW::LONG_FIRE_RESISTANCE"
+            - "TIPPED_ARROW::SWIFTNESS"
+            - "TIPPED_ARROW::LONG_SWIFTNESS"
+            - "TIPPED_ARROW::STRONG_SWIFTNESS"
+            - "TIPPED_ARROW::SLOWNESS"
+            - "TIPPED_ARROW::LONG_SLOWNESS"
+            - "TIPPED_ARROW::STRONG_SLOWNESS"
+            - "TIPPED_ARROW::WATER_BREATHING"
+            - "TIPPED_ARROW::LONG_WATER_BREATHING"
+            - "TIPPED_ARROW::INSTANT_HEAL"
+            - "TIPPED_ARROW::STRONG_HEALING"
+            - "TIPPED_ARROW::INSTANT_DAMAGE"
+            - "TIPPED_ARROW::STRONG_HARMING"
+            - "TIPPED_ARROW::POISON"
+            - "TIPPED_ARROW::LONG_POISON"
+            - "TIPPED_ARROW::STRONG_POISON"
+            - "TIPPED_ARROW::REGENERATION"
+            - "TIPPED_ARROW::LONG_REGENERATION"
+            - "TIPPED_ARROW::STRONG_REGENERATION"
+            - "TIPPED_ARROW::STRENGTH"
+            - "TIPPED_ARROW::LONG_STRENGTH"
+            - "TIPPED_ARROW::STRONG_STRENGTH"
+            - "TIPPED_ARROW::WEAKNESS"
+            - "TIPPED_ARROW::LONG_WEAKNESS"
+            - "TIPPED_ARROW::LUCK"
+            - "TIPPED_ARROW::TURTLE_MASTER"
+            - "TIPPED_ARROW::LONG_TURTLE_MASTER"
+            - "TIPPED_ARROW::STRONG_TURTLE_MASTER"
+            - "TIPPED_ARROW::SLOW_FALLING"
+            - "TIPPED_ARROW::LONG_SLOW_FALLING"
+        POTION:
+          TITLE: "&8Potions"
+          OFFICIAL-ICONS:
+            BACK-TO:
+              NAME: "&7&lBack"
+              MATERIAL: ARROW
+              LORE:
+                - "&7Click to go back"
+            SWITCH-TO-SPLASH:
+              NAME: "&bShow splash potions"
+              MATERIAL: SPLASH_POTION
+            SWITCH-TO-DRINKABLE:
+              NAME: "&bShow drinkable potions"
+              MATERIAL: POTION
+          DRINKABLE-POTIONS:
+            ITEMS:
+              - "POTION::NIGHT_VISION"
+              - "POTION::LONG_NIGHT_VISION"
+              - "POTION::INVISIBILITY"
+              - "POTION::LONG_INVISIBILITY"
+              - "POTION::JUMP"
+              - "POTION::LONG_LEAPING"
+              - "POTION::STRONG_LEAPING"
+              - "POTION::FIRE_RESISTANCE"
+              - "POTION::LONG_FIRE_RESISTANCE"
+              - "POTION::SPEED"
+              - "POTION::LONG_SWIFTNESS"
+              - "POTION::STRONG_SWIFTNESS"
+              - "POTION::SLOWNESS"
+              - "POTION::LONG_SLOWNESS"
+              - "POTION::STRONG_SLOWNESS"
+              - "POTION::WATER_BREATHING"
+              - "POTION::LONG_WATER_BREATHING"
+              - "POTION::INSTANT_HEAL"
+              - "POTION::STRONG_HEALING"
+              - "POTION::INSTANT_DAMAGE"
+              - "POTION::STRONG_HARMING"
+              - "POTION::POISON"
+              - "POTION::LONG_POISON"
+              - "POTION::STRONG_POISON"
+              - "POTION::REGEN"
+              - "POTION::LONG_REGENERATION"
+              - "POTION::STRONG_REGENERATION"
+              - "POTION::STRENGTH"
+              - "POTION::LONG_STRENGTH"
+              - "POTION::STRONG_STRENGTH"
+              - "POTION::WEAKNESS"
+              - "POTION::LONG_WEAKNESS"
+              - "POTION::LUCK"
+              - "POTION::TURTLE_MASTER"
+              - "POTION::LONG_TURTLE_MASTER"
+              - "POTION::STRONG_TURTLE_MASTER"
+              - "POTION::SLOW_FALLING"
+              - "POTION::LONG_SLOW_FALLING"
+          SPLASH-POTIONS:
+            ITEMS:
+              - "SPLASH_POTION::NIGHT_VISION"
+              - "SPLASH_POTION::LONG_NIGHT_VISION"
+              - "SPLASH_POTION::INVISIBILITY"
+              - "SPLASH_POTION::LONG_INVISIBILITY"
+              - "SPLASH_POTION::JUMP"
+              - "SPLASH_POTION::LONG_LEAPING"
+              - "SPLASH_POTION::STRONG_LEAPING"
+              - "SPLASH_POTION::FIRE_RESISTANCE"
+              - "SPLASH_POTION::LONG_FIRE_RESISTANCE"
+              - "SPLASH_POTION::SPEED"
+              - "SPLASH_POTION::LONG_SWIFTNESS"
+              - "SPLASH_POTION::STRONG_SWIFTNESS"
+              - "SPLASH_POTION::SLOWNESS"
+              - "SPLASH_POTION::LONG_SLOWNESS"
+              - "SPLASH_POTION::STRONG_SLOWNESS"
+              - "SPLASH_POTION::WATER_BREATHING"
+              - "SPLASH_POTION::LONG_WATER_BREATHING"
+              - "SPLASH_POTION::INSTANT_HEAL"
+              - "SPLASH_POTION::STRONG_HEALING"
+              - "SPLASH_POTION::INSTANT_DAMAGE"
+              - "SPLASH_POTION::STRONG_HARMING"
+              - "SPLASH_POTION::POISON"
+              - "SPLASH_POTION::LONG_POISON"
+              - "SPLASH_POTION::STRONG_POISON"
+              - "SPLASH_POTION::REGEN"
+              - "SPLASH_POTION::LONG_REGENERATION"
+              - "SPLASH_POTION::STRONG_REGENERATION"
+              - "SPLASH_POTION::STRENGTH"
+              - "SPLASH_POTION::LONG_STRENGTH"
+              - "SPLASH_POTION::STRONG_STRENGTH"
+              - "SPLASH_POTION::WEAKNESS"
+              - "SPLASH_POTION::LONG_WEAKNESS"
+              - "SPLASH_POTION::LUCK"
+              - "SPLASH_POTION::TURTLE_MASTER"
+              - "SPLASH_POTION::LONG_TURTLE_MASTER"
+              - "SPLASH_POTION::STRONG_TURTLE_MASTER"
+              - "SPLASH_POTION::SLOW_FALLING"
+              - "SPLASH_POTION::LONG_SLOW_FALLING"
+        FOOD:
+          TITLE: "&8Food"
+          ITEMS:
+            - "APPLE"
+            - "MUSHROOM_STEW"
+            - "BREAD"
+            - "PORKCHOP"
+            - "COOKED_PORKCHOP"
+            - "GOLDEN_APPLE"
+            - "ENCHANTED_GOLDEN_APPLE"
+            - "COD"
+            - "SALMON"
+            - "TROPICAL_FISH"
+            - "PUFFERFISH"
+            - "COOKED_COD"
+            - "COOKED_SALMON"
+            - "CAKE"
+            - "COOKIE"
+            - "MELON_SLICE"
+            - "DRIED_KELP"
+            - "BEEF"
+            - "COOKED_BEEF"
+            - "CHICKEN"
+            - "COOKED_CHICKEN"
+            - "ROTTEN_FLESH"
+            - "SPIDER_EYE"
+            - "CARROT"
+            - "POTATO"
+            - "BAKED_POTATO"
+            - "GOLDEN_CARROT"
+            - "PUMPKIN_PIE"
+            - "RABBIT"
+            - "COOKED_RABBIT"
+            - "RABBIT_STEW"
+            - "MUTTON"
+            - "COOKED_MUTTON"
+            - "CHORUS_FRUIT"
+            - "BEETROOT"
+            - "BEETROOT_SOUP"
+            - "SUSPICIOUS_STEW"
+            - "SWEET_BERRIES"
+            - "GLOW_BERRIES"
+            - "HONEY_BOTTLE"
+        BLOCKS:
+          TITLE: "&8Blocks"
+          ITEMS:
+            - "OBSIDIAN"
+            - "ANVIL"
+            - "NETHERITE_BLOCK"
+            - "CRYING_OBSIDIAN"
+            - "ENCHANTING_TABLE"
+            - "ENDER_CHEST"
+            - "END_STONE"
+            - "COBBLESTONE"
+            - "COAL_BLOCK"
+            - "IRON_BLOCK"
+            - "GOLD_BLOCK"
+            - "DIAMOND_BLOCK"
+            - "EMERALD_BLOCK"
+            - "COPPER_BLOCK"
+            - "DEEPSLATE"
+            - "IRON_DOOR"
+            - "COBWEB"
+            - "OAK_PLANKS"
+            - "LAPIS_BLOCK"
+            - "OAK_DOOR"
+            - "POINTED_DRIPSTONE"
+            - "BLUE_ICE"
+            - "CRAFTING_TABLE"
+            - "BONE_BLOCK"
+            - "OAK_LOG"
+            - "GRAY_CONCRETE"
+            - "AMETHYST_BLOCK"
+            - "PUMPKIN"
+            - "MELON"
+            - "SHROOMLIGHT"
+            - "SANDSTONE"
+            - "WHITE_WOOL"
+            - "QUARTZ_BLOCK"
+            - "GRAVEL"
+            - "CLAY"
+            - "SPONGE"
+            - "PACKED_ICE"
+            - "MAGMA_BLOCK"
+            - "SOUL_SAND"
+            - "HAY_BLOCK"
+            - "DIRT"
+            - "SAND"
+            - "ICE"
+            - "TARGET"
+            - "SOUL_SOIL"
+            - "NETHERRACK"
+            - "GLASS"
+            - "GLOWSTONE"
+            - "SNOW_BLOCK"
+            - "SLIME_BLOCK"
+            - "HONEY_BLOCK"
+            - "SCAFFOLDING"
+            - "TNT"
+            - "REDSTONE_BLOCK"
+            - "NOTE_BLOCK"
+            - "PISTON"
+            - "STICKY_PISTON"
+            - "DISPENSER"
+            - "REPEATER"
+            - "COMPARATOR"
+            - "RAIL"
+            - "POWERED_RAIL"
+            - "ACTIVATOR_RAIL"
+            - "DETECTOR_RAIL"
+            - "TRIPWIRE_HOOK"
+            - "STRING"
+            - "MOSS_BLOCK"
+            - "STONE"
+        SHULKER-BOXES:
+          TITLE: "&8Shulker Boxes"
+    ENCHANT-GUI:
+      TITLE: "&8Add enchantments"
+      ICONS:
+        BACK-TO:
+          NAME: "&7&lBack"
+          MATERIAL: ARROW
+          LORE:
+            - "&7Click to go back"
+        MAKE-UNBREAKABLE:
+          NAME: "&bMake unbreakable"
+          MATERIAL: STONE_BRICKS
+        MAKE-BREAKABLE:
+          NAME: "&bMake breakable"
+          MATERIAL: STONE_BRICKS
+        CLEAR-ENCHANTS:
+          NAME: "&bClear Enchants"
+          MATERIAL: BARRIER
+        CHANGE-DURABILITY:
+          NAME: "&bChange Durability"
+          MATERIAL: ANVIL
+        SET-ENCHANTMENT-LEVEL:
+          NAME: "&d%enchantment% &7- &e%level%"
+          MATERIAL: SUGAR
+          LORE:
+            - "&8&m------------------------"
+            - "&7Click here to set the level of"
+            - "&7the &d%enchantment% &7enchantment."
+            - "&8&m------------------------"
+        SET-ENCHANTMENT-LEVEL-PLACEHOLDER:
+          NAME: " "
+          MATERIAL: BLUE_STAINED_GLASS_PANE
+        ENCHANTMENT-ICON:
+          NAME: "&d%enchantment%"
+          MATERIAL: ENCHANTED_BOOK
+          LORE:
+            - "&8&m------------------------"
+            - "&7Click here to select"
+            - "&7the &d%enchantment% &7enchantment."
+            - "&8&m------------------------"
+    CUSTOM-DURABILITY-GUI:
+      TITLE: "1-%max%"
+    CHANGE-COUNT-GUI:
+      TITLE: "&8Change item count"
+      ICONS:
+        BACK-TO:
+          NAME: "&7&lBack"
+          MATERIAL: ARROW
+          LORE:
+            - "&7Click to go back"
+        CUSTOM-COUNT:
+          NAME: "&bCustom Amount"
+          MATERIAL: PAPER
+    CUSTOM-COUNT-GUI:
+      TITLE: "Enter a number 1-%max%"
+DISABLED-ENCHANTS:
+  _CHESTPLATE:
+    - "THORNS"
+    - "BINDING_CURSE"
+    - "VANISHING_CURSE"
+  IRON_SWORD:
+    - "SHARPNESS"
+
+DEFAULT-SETTINGS:
+  NAME: "Kit %id%"
+  REGENERATION: true
+  HUNGER: true
+  BUILD: true
+  ROUNDS: 1
+  HITDELAY: 20
+  EP_COOLDOWN: 13
+  GA_COOLDOWN: 5
+  WIND_CHARGE_COOLDOWN: 0
+  HEALTH_BELOW_NAME: false
+
+MATCH-TYPES: # Options: DUEL, PARTY_FFA, PARTY_SPLIT, PARTY_VS_PARTY
+  - "DUEL"
+  - "PARTY_FFA"
+  - "PARTY_SPLIT"
+  - "PARTY_VS_PARTY"

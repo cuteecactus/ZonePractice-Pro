@@ -17,12 +17,10 @@ import dev.nandi0813.practice.manager.inventory.InventoryManager;
 import dev.nandi0813.practice.manager.ladder.abstraction.Ladder;
 import dev.nandi0813.practice.manager.ladder.abstraction.interfaces.DeathResult;
 import dev.nandi0813.practice.manager.ladder.abstraction.normal.NormalLadder;
-import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.server.sound.SoundManager;
 import dev.nandi0813.practice.manager.server.sound.SoundType;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.playerutil.PlayerUtil;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -53,14 +51,12 @@ public class Duel extends Match implements Team {
         this.type = MatchType.DUEL;
         this.ranked = ranked;
 
-        this.player1 = players.get(0);
+        this.player1 = players.getFirst();
         this.playerProfiles.put(player1, ProfileManager.getInstance().getProfile(player1));
-        NametagManager.getInstance().setNametag(player1, TeamEnum.TEAM1.getPrefix(), TeamEnum.TEAM1.getNameColor(), TeamEnum.TEAM1.getSuffix(), 20);
 
         if (players.size() == 2) {
             this.player2 = players.get(1);
             this.playerProfiles.put(player2, ProfileManager.getInstance().getProfile(player2));
-            NametagManager.getInstance().setNametag(player2, TeamEnum.TEAM2.getPrefix(), TeamEnum.TEAM2.getNameColor(), TeamEnum.TEAM2.getSuffix(), 21);
         } else {
             this.player2 = null;
         }
@@ -144,7 +140,7 @@ public class Duel extends Match implements Team {
                     new TempKillPlayer(round, player, respawnableLadder.getRespawnTime());
                     SoundManager.getInstance().getSound(SoundType.MATCH_PLAYER_TEMP_DEATH).play(this.getPeople());
                 });
-                ClassImport.getClasses().getPlayerUtil().clearInventory(player);
+                dev.nandi0813.practice.manager.fight.util.PlayerUtil.clearInventory(player);
                 player.setHealth(20);
                 break;
 
@@ -152,10 +148,12 @@ public class Duel extends Match implements Team {
                 if (isRespawnableLadder()) {
                     // Respawnable ladder but player is eliminated (e.g., bed destroyed)
                     this.getCurrentStat(player).end(true);
-                    this.teleportPlayer(player);
+                    if (this.getLadder().getRoundEndDelay() <= 0 || this.wasLastDeathVoid(player)) {
+                        this.teleportPlayer(player);
+                    }
                     endRound = true;
                     SoundManager.getInstance().getSound(SoundType.MATCH_PLAYER_DEATH).play(this.getPeople());
-                    ClassImport.getClasses().getPlayerUtil().clearInventory(player);
+                    dev.nandi0813.practice.manager.fight.util.PlayerUtil.clearInventory(player);
                     player.setHealth(20);
                 } else if (isScoringLadder()) {
                     // Scoring ladder (like Boxing) - death doesn't end round
@@ -164,8 +162,8 @@ public class Duel extends Match implements Team {
                     // Default death behavior for standard ladders
                     this.getCurrentStat(player).end(true);
                     PlayerUtil.setFightPlayer(player);
-                    addEntityChange(ClassImport.getClasses().getPlayerUtil().dropPlayerInventory(player));
-                    ClassImport.getClasses().getPlayerUtil().clearInventory(player);
+                    addEntityChange(dev.nandi0813.practice.manager.fight.util.PlayerUtil.dropPlayerInventory(player));
+                    dev.nandi0813.practice.manager.fight.util.PlayerUtil.clearInventory(player);
                     player.setHealth(20);
                     SoundManager.getInstance().getSound(SoundType.MATCH_PLAYER_DEATH).play(this.getPeople());
                     endRound = true;
@@ -228,11 +226,12 @@ public class Duel extends Match implements Team {
             return true;
 
         if (this.players.size() == 1) {
-            if (status.equals(MatchStatus.START))
+            if (status.equals(MatchStatus.START)) {
                 this.matchWinner = null;
-            else
+            } else {
                 this.matchWinner = this.players.stream().findAny().get();
-
+                this.loser = this.getOppositePlayer(this.matchWinner);
+            }
             return true;
         }
 

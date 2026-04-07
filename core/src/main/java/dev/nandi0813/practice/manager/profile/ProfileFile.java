@@ -6,16 +6,27 @@ import dev.nandi0813.practice.manager.fight.match.util.CustomKit;
 import dev.nandi0813.practice.manager.ladder.LadderManager;
 import dev.nandi0813.practice.manager.ladder.abstraction.Ladder;
 import dev.nandi0813.practice.manager.ladder.abstraction.normal.NormalLadder;
+import dev.nandi0813.practice.manager.profile.cosmetics.CosmeticsData;
+import dev.nandi0813.practice.manager.profile.cosmetics.CosmeticsPermissionManager;
+import dev.nandi0813.practice.manager.profile.cosmetics.armortrim.ArmorSlot;
+import dev.nandi0813.practice.manager.profile.cosmetics.armortrim.ArmorTrimTier;
+import dev.nandi0813.practice.manager.profile.cosmetics.deatheffect.DeathEffect;
+import dev.nandi0813.practice.manager.profile.cosmetics.shield.ShieldLayout;
+import dev.nandi0813.practice.manager.profile.enums.ProfilePrefixVisibility;
 import dev.nandi0813.practice.manager.profile.enums.ProfileWorldTime;
 import dev.nandi0813.practice.manager.profile.group.Group;
 import dev.nandi0813.practice.manager.profile.group.GroupManager;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.ItemSerializationUtil;
-import net.kyori.adventure.text.Component;
+import dev.nandi0813.practice.util.NameFormatUtil;
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
+import net.kyori.adventure.key.Key;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.trim.TrimMaterial;
+import org.bukkit.inventory.meta.trim.TrimPattern;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class ProfileFile extends ConfigFile {
 
@@ -39,14 +50,19 @@ public class ProfileFile extends ConfigFile {
             config.set("group", null);
 
         if (profile.getPrefix() != null)
-            config.set("prefix", profile.getPrefix());
+            config.set("prefix", dev.nandi0813.practice.ZonePractice.getMiniMessage().serialize(profile.getPrefix()));
         else
             config.set("prefix", null);
 
         if (profile.getSuffix() != null)
-            config.set("suffix", profile.getSuffix());
+            config.set("suffix", dev.nandi0813.practice.ZonePractice.getMiniMessage().serialize(profile.getSuffix()));
         else
             config.set("suffix", null);
+
+        if (profile.getNameTemplate() != null && !profile.getNameTemplate().isEmpty())
+            config.set("name-template", profile.getNameTemplate());
+        else
+            config.set("name-template", null);
 
         int customKitPerm = profile.getCustomKitPerm();
         if (customKitPerm > 0) config.set("allowed-custom-kits", customKitPerm);
@@ -60,6 +76,40 @@ public class ProfileFile extends ConfigFile {
         config.set("settings.flying", profile.isFlying());
         config.set("settings.messages", profile.isPrivateMessages());
         config.set("settings.worldtime", profile.getWorldTime().toString());
+        config.set("settings.prefix-visibility", profile.getPrefixVisibility().toString());
+
+        // Cosmetics data for armor trims
+        if (profile.getCosmeticsData() != null) {
+            config.set("cosmetics.active-tier", profile.getCosmeticsData().getActiveTier().getId());
+            config.set("cosmetics.death-effect", profile.getCosmeticsData().getDeathEffect().getId());
+            config.set("cosmetics.lobby-item", profile.getCosmeticsData().getLobbyItemType().name());
+            config.set("cosmetics.shield.active-layout-index", profile.getCosmeticsData().getActiveShieldLayoutIndex());
+
+            List<String> serializedShieldLayouts = profile.getCosmeticsData().getShieldLayouts().stream()
+                    .map(ShieldLayout::serialise)
+                    .toList();
+            config.set("cosmetics.shield.layouts", serializedShieldLayouts);
+
+            for (ArmorTrimTier tier : ArmorTrimTier.values()) {
+                for (ArmorSlot slot : ArmorSlot.values()) {
+                    String basePath = "cosmetics.tiers." + tier.getId() + "." + slot.getId();
+
+                    TrimPattern pattern = profile.getCosmeticsData().getPattern(tier, slot);
+                    if (pattern != null) {
+                        config.set(basePath + ".pattern", "minecraft:" + CosmeticsPermissionManager.getTrimId(pattern));
+                    } else {
+                        config.set(basePath + ".pattern", null);
+                    }
+
+                    TrimMaterial material = profile.getCosmeticsData().getMaterial(tier, slot);
+                    if (material != null) {
+                        config.set(basePath + ".material", "minecraft:" + CosmeticsPermissionManager.getTrimId(material));
+                    } else {
+                        config.set(basePath + ".material", null);
+                    }
+                }
+            }
+        }
 
         // Ladder win/lose stats
         for (NormalLadder ladder : LadderManager.getInstance().getLadders()) {
@@ -111,18 +161,11 @@ public class ProfileFile extends ConfigFile {
         config.set("settings.messages", ConfigManager.getBoolean("PLAYER.DEFAULT-SETTINGS.PRIVATEMESSAGE"));
         config.set("settings.worldtime", ProfileWorldTime.valueOf(ConfigManager.getString("PLAYER.DEFAULT-SETTINGS.WORLD-TIME")).toString());
 
-        for (NormalLadder ladder : LadderManager.getInstance().getLadders()) {
-            String name = ladder.getName().toLowerCase();
-
-            config.set("stats.ladder-stats." + name + ".unranked.wins", 0);
-            config.set("stats.ladder-stats." + name + ".unranked.losses", 0);
-
-            if (ladder.isRanked()) {
-                config.set("stats.elo." + name, LadderManager.getDEFAULT_ELO());
-
-                config.set("stats.ladder-stats." + name + ".ranked.wins", 0);
-                config.set("stats.ladder-stats." + name + ".ranked.losses", 0);
-            }
+        String defaultPrefixVisibility = ConfigManager.getString("PLAYER.DEFAULT-SETTINGS.PREFIX-VISIBILITY");
+        try {
+            config.set("settings.prefix-visibility", ProfilePrefixVisibility.valueOf(defaultPrefixVisibility.toUpperCase(Locale.ROOT)).toString());
+        } catch (Exception ignored) {
+            config.set("settings.prefix-visibility", ProfilePrefixVisibility.PREFIX_AND_SUFFIX.toString());
         }
 
         saveFile();
@@ -151,10 +194,13 @@ public class ProfileFile extends ConfigFile {
         }
 
         if (config.isString("prefix"))
-            profile.setPrefix(Component.text(config.getString("prefix")));
+            profile.setPrefix(NameFormatUtil.parseConfiguredComponent(Objects.requireNonNull(config.getString("prefix"))));
 
         if (config.isString("suffix"))
-            profile.setSuffix(Component.text(config.getString("suffix")));
+            profile.setSuffix(NameFormatUtil.parseConfiguredComponent(Objects.requireNonNull(config.getString("suffix"))));
+
+        if (config.isString("name-template"))
+            profile.setNameTemplate(config.getString("name-template"));
 
         if (config.isInt("allowed-custom-kits"))
             profile.setAllowedCustomKits(config.getInt("allowed-custom-kits"));
@@ -167,6 +213,81 @@ public class ProfileFile extends ConfigFile {
         profile.setFlying(config.getBoolean("settings.flying"));
         profile.setPrivateMessages(config.getBoolean("settings.messages"));
         profile.setWorldTime(ProfileWorldTime.valueOf(config.getString("settings.worldtime")));
+
+        String rawPrefixVisibility = config.getString("settings.prefix-visibility", ProfilePrefixVisibility.PREFIX_AND_SUFFIX.toString());
+        try {
+            profile.setPrefixVisibility(ProfilePrefixVisibility.valueOf(rawPrefixVisibility.toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException ignored) {
+            profile.setPrefixVisibility(ProfilePrefixVisibility.PREFIX_AND_SUFFIX);
+        }
+
+        // Load cosmetics data for armor trims
+        try {
+            ArmorTrimTier activeTier = ArmorTrimTier.fromId(config.getString("cosmetics.active-tier", "leather"));
+            profile.getCosmeticsData().setActiveTier(activeTier);
+            profile.getCosmeticsData().setDeathEffect(DeathEffect.fromId(config.getString("cosmetics.death-effect", "none")));
+            profile.getCosmeticsData().setLobbyItemType(CosmeticsData.LobbyItemType.valueOf(
+                    config.getString("cosmetics.lobby-item", CosmeticsData.LobbyItemType.NONE.name()).toUpperCase(Locale.ROOT)
+            ));
+
+            List<ShieldLayout> shieldLayouts = new ArrayList<>();
+            for (String serializedLayout : config.getStringList("cosmetics.shield.layouts")) {
+                ShieldLayout layout = ShieldLayout.deserialise(serializedLayout);
+                if (layout != null) {
+                    shieldLayouts.add(layout);
+                }
+            }
+            profile.getCosmeticsData().setShieldLayouts(shieldLayouts);
+
+            int activeShieldLayoutIndex = config.getInt("cosmetics.shield.active-layout-index", -1);
+            if (activeShieldLayoutIndex < -1 || activeShieldLayoutIndex >= shieldLayouts.size()) {
+                activeShieldLayoutIndex = -1;
+            }
+            profile.getCosmeticsData().setActiveShieldLayoutIndex(activeShieldLayoutIndex);
+
+            boolean loadedTierData = false;
+            for (ArmorTrimTier tier : ArmorTrimTier.values()) {
+                for (ArmorSlot slot : ArmorSlot.values()) {
+                    String basePath = "cosmetics.tiers." + tier.getId() + "." + slot.getId();
+
+                    if (config.isString(basePath + ".pattern")) {
+                        TrimPattern pattern = getTrimPatternByName(config.getString(basePath + ".pattern"));
+                        if (pattern != null) {
+                            profile.getCosmeticsData().setPattern(tier, slot, pattern);
+                            loadedTierData = true;
+                        }
+                    }
+
+                    if (config.isString(basePath + ".material")) {
+                        TrimMaterial material = getTrimMaterialByName(config.getString(basePath + ".material"));
+                        if (material != null) {
+                            profile.getCosmeticsData().setMaterial(tier, slot, material);
+                            loadedTierData = true;
+                        }
+                    }
+                }
+            }
+
+            if (!loadedTierData) {
+                for (ArmorSlot slot : ArmorSlot.values()) {
+                    String legacyPath = "cosmetics." + slot.getId();
+                    if (config.isString(legacyPath + ".pattern")) {
+                        TrimPattern pattern = getTrimPatternByName(config.getString(legacyPath + ".pattern"));
+                        if (pattern != null) {
+                            profile.getCosmeticsData().setPattern(ArmorTrimTier.LEATHER, slot, pattern);
+                        }
+                    }
+                    if (config.isString(legacyPath + ".material")) {
+                        TrimMaterial material = getTrimMaterialByName(config.getString(legacyPath + ".material"));
+                        if (material != null) {
+                            profile.getCosmeticsData().setMaterial(ArmorTrimTier.LEATHER, slot, material);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Handle invalid cosmetics data - silently ignore for graceful handling of removed/renamed cosmetics
+        }
 
         for (NormalLadder ladder : LadderManager.getInstance().getLadders()) {
             String name = ladder.getName().toLowerCase();
@@ -211,6 +332,26 @@ public class ProfileFile extends ConfigFile {
     public void deleteCustomKit(Ladder ladder) {
         config.set("customkit." + ladder.getName().toLowerCase(), null);
         saveFile();
+    }
+
+    private TrimPattern getTrimPatternByName(String name) {
+        if (name == null || name.isBlank()) return null;
+        String normalized = normalizeKey(name);
+        return RegistryAccess.registryAccess().getRegistry(RegistryKey.TRIM_PATTERN).get(Key.key(normalized));
+    }
+
+    private TrimMaterial getTrimMaterialByName(String name) {
+        if (name == null || name.isBlank()) return null;
+        String normalized = normalizeKey(name);
+        return RegistryAccess.registryAccess().getRegistry(RegistryKey.TRIM_MATERIAL).get(Key.key(normalized));
+    }
+
+    private String normalizeKey(String key) {
+        String normalized = key.trim().toLowerCase();
+        if (!normalized.contains(":")) {
+            return "minecraft:" + normalized;
+        }
+        return normalized;
     }
 
 }

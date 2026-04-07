@@ -35,6 +35,8 @@ public enum GUIType {
 
     Queue_Unranked,
     Queue_Ranked,
+    Queue_CustomKitChooseType,
+    Queue_CustomKitHostSelector,
 
     Party_OtherParties,
     Party_Events,
@@ -68,6 +70,9 @@ public enum GUIType {
     PlayerCustom_Potions,
     PlayerCustom_Food,
     PlayerCustom_Blocks,
+    PlayerCustom_DynamicCategory,
+    PlayerCustom_Shulker,
+    PlayerCustom_ShulkerEditor,
     PlayerCustom_ChangeAmount,
     PlayerCustom_ChangeCustomAmount,
     PlayerCustom_Enchant,
@@ -93,6 +98,29 @@ public enum GUIType {
 
     DivisionGui,
 
+    FFA_Arena_Selector,
     FFA_Ladder_Selector,
+
+    // Cosmetics GUIs
+    Cosmetics_Hub,
+
+    ArmorTrimMainGui,
+    Cosmetics_Helmet,
+    Cosmetics_Chestplate,
+    Cosmetics_Leggings,
+    Cosmetics_Boots,
+    Cosmetics_Shield,
+    Cosmetics_Shield_Layouts,
+    Cosmetics_Shield_Editor,
+    Cosmetics_Shield_ColorPicker,
+    Cosmetics_Shield_PatternPicker,
+    Cosmetics_Pattern_Selection,
+    Cosmetics_Material_Selection,
+    Cosmetics_LobbyItems,
+
+    Cosmetics_DeathEffects,
+
+    // Match History
+    MatchHistory_Gui,
 
 }

@@ -91,6 +91,13 @@ public class ArenaManager implements Listener {
         return enabledArenas;
     }
 
+    public List<FFAArena> getEnabledFFAArenas() {
+        List<FFAArena> enabledArenas = new ArrayList<>();
+        for (FFAArena arena : this.getFFAArenas())
+            if (arena.isEnabled()) enabledArenas.add(arena);
+        return enabledArenas;
+    }
+
     public void loadArenas(final StartUpCallback boolCallback) {
         Bukkit.getScheduler().runTaskAsynchronously(ZonePractice.getInstance(), () ->
         {
@@ -131,22 +138,21 @@ public class ArenaManager implements Listener {
     public void removeLadder(NormalLadder ladder) {
         for (DisplayArena arena : arenaList) {
             if (arena.getAssignedLadders().contains(ladder)) {
+                // Remember this arena so we can restore the assignment when re-enabled
+                ladder.getPreviouslyAssignedArenas().add(arena.getName());
+
                 arena.getAssignedLadders().remove(ladder);
 
                 ArenaGUISetupManager.getInstance().getArenaSetupGUIs().get(arena).get(GUIType.Arena_Ladders_Single).update();
             }
 
-            if (arena.isEnabled() && arena.getAssignedLadders().isEmpty()) {
-                arena.setEnabled(false);
-            } else {
-                if (arena instanceof FFAArena) {
-                    FFA ffa = ((FFAArena) arena).getFfa();
+            if (arena instanceof FFAArena) {
+                FFA ffa = ((FFAArena) arena).getFfa();
 
-                    for (Map.Entry<Player, NormalLadder> ffaPlayer : ffa.getPlayers().entrySet()) {
-                        if (ffaPlayer.getValue() == ladder) {
-                            ffa.removePlayer(ffaPlayer.getKey());
-                            Common.sendMMMessage(ffaPlayer.getKey(), LanguageManager.getString("FFA.LADDER-DISABLED-REMOVED"));
-                        }
+                for (Map.Entry<Player, NormalLadder> ffaPlayer : ffa.getPlayers().entrySet()) {
+                    if (ffaPlayer.getValue() == ladder) {
+                        ffa.removePlayer(ffaPlayer.getKey());
+                        Common.sendMMMessage(ffaPlayer.getKey(), LanguageManager.getString("FFA.LADDER-DISABLED-REMOVED"));
                     }
                 }
             }

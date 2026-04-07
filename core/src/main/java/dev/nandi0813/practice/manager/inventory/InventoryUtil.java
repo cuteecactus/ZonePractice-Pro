@@ -1,15 +1,15 @@
 package dev.nandi0813.practice.manager.inventory;
 
+import dev.nandi0813.api.Utilities.PlayerNametag;
 import dev.nandi0813.practice.manager.backend.ConfigManager;
+import dev.nandi0813.practice.manager.fight.util.PlayerUtil;
 import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.nametag.TabIntegration;
 import dev.nandi0813.practice.manager.nametag.TeamPacketBlocker;
 import dev.nandi0813.practice.manager.profile.Profile;
-import dev.nandi0813.practice.manager.profile.group.Group;
-import dev.nandi0813.practice.module.util.ClassImport;
-import dev.nandi0813.practice.util.Common;
+import dev.nandi0813.practice.util.NameFormatUtil;
+import dev.nandi0813.practice.util.PermanentConfig;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 
@@ -18,64 +18,90 @@ public enum InventoryUtil {
 
     public static void setLobbyNametag(Player player, Profile profile) {
         if (!ConfigManager.getBoolean("PLAYER.LOBBY-NAMETAG.ENABLED")) {
-            NametagManager.getInstance().reset(player.getName());
+            if (PermanentConfig.NAMETAG_MANAGEMENT_ENABLED) {
+                NametagManager.getInstance().reset(player.getName());
+            }
         } else {
-            Group group = profile.getGroup();
-            Component prefix = Component.empty(), suffix = Component.empty();
-            NamedTextColor nameColor = NamedTextColor.GRAY;
-            int sortPriority = 10;
+            LobbyNametag playerNametag = getLobbyNametag(profile, player.getName());
 
-            if (group != null) {
-                prefix = group.getPrefix()
-                        .replaceText(
-                                TextReplacementConfig.builder()
-                                        .match("%division%")
-                                        .replacement(profile.getStats().getDivision() != null ? Common.mmToNormal(profile.getStats().getDivision().getFullName()) : "")
-                                        .build()
-                        ).replaceText(
-                                TextReplacementConfig.builder()
-                                        .match("%division_short%")
-                                        .replacement(profile.getStats().getDivision() != null ? Common.mmToNormal(profile.getStats().getDivision().getShortName()) : "")
-                                        .build()
-                        );
+            Component prefix = playerNametag.getPrefix();
+            Component name = playerNametag.getName();
+            NamedTextColor nameColor = playerNametag.getScoreboardNameColor();
+            Component suffix = playerNametag.getSuffix();
+            int sortPriority = playerNametag.getSortPriority();
 
-                suffix = group.getSuffix()
-                        .replaceText(
-                                TextReplacementConfig.builder()
-                                        .match("%division%")
-                                        .replacement(profile.getStats().getDivision() != null ? Common.mmToNormal(profile.getStats().getDivision().getFullName()) : "")
-                                        .build()
-                        ).replaceText(
-                                TextReplacementConfig.builder()
-                                        .match("%division_short%")
-                                        .replacement(profile.getStats().getDivision() != null ? Common.mmToNormal(profile.getStats().getDivision().getShortName()) : "")
-                                        .build()
-                        );
+            if (PermanentConfig.NAMETAG_MANAGEMENT_ENABLED) {
+                // ── Tab-list formatting ──────────────────────────────────────
+                Component listName = prefix.append(name).append(suffix);
 
-                nameColor = group.getNameColor();
+                TabIntegration tabIntegration = TeamPacketBlocker.getInstance().getTabIntegration();
+                if (tabIntegration != null && tabIntegration.isAvailable()) {
+                    tabIntegration.setTabListName(player, listName);
+                } else {
+                    PlayerUtil.setPlayerListName(player, listName);
+                }
 
-                sortPriority = group.getSortPriority();
+                // ── Nametag management (above-head prefix / suffix / color) ──
+                NametagManager.getInstance().setNametag(player, prefix, nameColor, suffix, sortPriority);
             }
+        }
+    }
 
-            if (profile.getPrefix() != null) prefix = profile.getPrefix();
-            if (profile.getSuffix() != null) suffix = profile.getSuffix();
+    public static LobbyNametag getLobbyNametag(Profile profile, String playerName) {
+        Component prefix = NameFormatUtil.resolvePrefix(profile);
+        Component name = NameFormatUtil.resolveName(profile, playerName);
+        Component suffix = NameFormatUtil.resolveSuffix(profile);
 
-            Component listName = prefix.append(Component.text(player.getName(), nameColor)).append(suffix);
-            listName = listName
-                    .replaceText(TextReplacementConfig.builder().match("%division%").replacement(profile.getStats().getDivision() != null ? profile.getStats().getDivision().getComponentFullName() : Component.empty()).build())
-                    .replaceText(TextReplacementConfig.builder().match("%division_short%").replacement(profile.getStats().getDivision() != null ? profile.getStats().getDivision().getComponentShortName() : Component.empty()).build());
+        NamedTextColor scoreboardNameColor = NameFormatUtil.resolveScoreboardColor(profile, playerName, NamedTextColor.GRAY);
+        int sortPriority = profile.getGroup() != null ? profile.getGroup().getSortPriority() : 10;
 
-            // Check if TAB integration is available and use it, otherwise use direct API
-            TabIntegration tabIntegration = TeamPacketBlocker.getInstance().getTabIntegration();
-            if (tabIntegration != null && tabIntegration.isAvailable()) {
-                // Use TAB API to set tablist name
-                tabIntegration.setTabListName(player, listName);
-            } else {
-                // Use direct Bukkit API
-                ClassImport.getClasses().getPlayerUtil().setPlayerListName(player, listName);
-            }
+        return new LobbyNametag(prefix, name, scoreboardNameColor, suffix, sortPriority);
+    }
 
-            NametagManager.getInstance().setNametag(player, prefix, nameColor, suffix, sortPriority);
+    public static PlayerNametag getLobbyNametag(Profile profile) {
+        String playerName = profile.getPlayer() != null ? profile.getPlayer().getName() : "";
+        LobbyNametag lobbyNametag = getLobbyNametag(profile, playerName);
+        return new PlayerNametag(
+                lobbyNametag.getPrefix(),
+                lobbyNametag.getScoreboardNameColor(),
+                lobbyNametag.getSuffix(),
+                lobbyNametag.getSortPriority()
+        );
+    }
+
+    public static final class LobbyNametag {
+        private final Component prefix;
+        private final Component name;
+        private final NamedTextColor scoreboardNameColor;
+        private final Component suffix;
+        private final int sortPriority;
+
+        public LobbyNametag(Component prefix, Component name, NamedTextColor scoreboardNameColor, Component suffix, int sortPriority) {
+            this.prefix = prefix;
+            this.name = name;
+            this.scoreboardNameColor = scoreboardNameColor;
+            this.suffix = suffix;
+            this.sortPriority = sortPriority;
+        }
+
+        public Component getPrefix() {
+            return prefix;
+        }
+
+        public Component getName() {
+            return name;
+        }
+
+        public NamedTextColor getScoreboardNameColor() {
+            return scoreboardNameColor;
+        }
+
+        public Component getSuffix() {
+            return suffix;
+        }
+
+        public int getSortPriority() {
+            return sortPriority;
         }
     }
 

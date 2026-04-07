@@ -1,8 +1,8 @@
 package dev.nandi0813.practice.manager.gui;
 
-import dev.nandi0813.practice.module.interfaces.ItemCreateUtil;
-import dev.nandi0813.practice.module.util.ClassImport;
+import dev.nandi0813.practice.manager.ladder.util.LadderUtil;
 import dev.nandi0813.practice.util.Common;
+import dev.nandi0813.practice.util.ItemCreateUtil;
 import dev.nandi0813.practice.util.StringUtil;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,12 +10,11 @@ import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class GUIItem {
 
@@ -37,6 +36,8 @@ public class GUIItem {
     private final List<ItemFlag> itemFlags = new ArrayList<>();
     private final Map<Enchantment, Integer> enchantments = new HashMap<>();
     private int durability = -1;
+    @Getter
+    private ItemStack baseItemStack = null;
 
     public GUIItem() {
     }
@@ -89,13 +90,23 @@ public class GUIItem {
 
         ItemMeta itemMeta = itemStack.getItemMeta();
         if (itemMeta != null) {
-            this.name = itemMeta.getDisplayName();
-            this.lore = itemMeta.getLore();
+            if (itemMeta.hasDisplayName() && itemMeta.displayName() != null) {
+                this.name = Common.serializeComponentToLegacyString(itemMeta.displayName());
+            }
+            if (itemMeta.lore() != null) {
+                this.lore = Objects.requireNonNull(itemMeta.lore()).stream()
+                        .map(Common::serializeComponentToLegacyString)
+                        .collect(Collectors.toList());
+            }
             this.glowing = itemMeta.hasEnchants();
+            if (itemMeta instanceof Damageable damageable) {
+                this.damage = (short) damageable.getDamage();
+            }
         }
         this.amount = itemStack.getAmount();
-        this.damage = itemStack.getDurability();
         this.material = itemStack.getType();
+        // Preserve the full ItemStack so special meta (e.g. PotionMeta) is not lost
+        this.baseItemStack = itemStack.clone();
     }
 
     public GUIItem setGlowing(boolean glowing) {
@@ -111,38 +122,53 @@ public class GUIItem {
 
 
     public ItemStack get() {
-        if (material == null) return null;
-
         ItemStack itemStack;
-        if (damage == -1 && amount == 1) {
-            itemStack = new ItemStack(material);
-        } else if (damage == -1) {
-            itemStack = new ItemStack(material, amount);
-        } else {
-            itemStack = new ItemStack(material, amount, damage);
-        }
 
-        if (durability > 0) {
-            ClassImport.getClasses().getLadderUtil().setDurability(itemStack, durability);
+        if (baseItemStack != null) {
+            // Clone the base item to preserve special meta (e.g. PotionMeta for modern Minecraft)
+            itemStack = baseItemStack.clone();
+            itemStack.setAmount(amount);
+            ItemCreateUtil.hideItemFlags(itemStack);
+        } else {
+            if (material == null) return null;
+
+            if (damage == -1 && amount == 1) {
+                itemStack = new ItemStack(material);
+            } else if (damage == -1) {
+                itemStack = new ItemStack(material, amount);
+            } else {
+                itemStack = new ItemStack(material, amount);
+            }
+
+            if (durability > 0) {
+                LadderUtil.setDurability(itemStack, durability);
+            }
         }
 
         ItemMeta itemMeta = itemStack.getItemMeta();
         if (itemMeta != null) {
+            if (damage != -1 && itemMeta instanceof Damageable damageable) {
+                damageable.setDamage(damage);
+                itemMeta = damageable;
+            }
+
             if (name != null) {
-                itemMeta.setDisplayName(StringUtil.CC(name));
+                itemMeta.displayName(Common.legacyToComponent(StringUtil.CC(name)));
             }
 
             if (lore != null) {
-                itemMeta.setLore(StringUtil.CC(lore));
+                itemMeta.lore(StringUtil.CC(lore).stream()
+                        .map(Common::legacyToComponent)
+                        .collect(Collectors.toList()));
             }
 
             if (glowing && enchantments.isEmpty()) {
-                itemMeta.addEnchant(Enchantment.DURABILITY, 1, true);
+                itemMeta.addEnchant(Enchantment.UNBREAKING, 1, true);
             }
 
             // Apply unbreakable status if set (for modern versions to prevent durability bars)
             if (unbreakable) {
-                itemMeta = ClassImport.getClasses().getLadderUtil().setUnbreakable(itemMeta, true);
+                itemMeta = LadderUtil.setUnbreakable(itemMeta, true);
             }
 
             if (!itemFlags.isEmpty()) {
@@ -170,17 +196,24 @@ public class GUIItem {
         } else if (damage == -1) {
             itemStack = new ItemStack(material, amount);
         } else {
-            itemStack = new ItemStack(material, amount, damage);
+            itemStack = new ItemStack(material, amount);
         }
 
         ItemMeta itemMeta = itemStack.getItemMeta();
         if (itemMeta != null) {
+            if (damage != -1 && itemMeta instanceof Damageable damageable) {
+                damageable.setDamage(damage);
+                itemMeta = damageable;
+            }
+
             if (name != null) {
-                itemMeta.setDisplayName(StringUtil.CC(name));
+                itemMeta.displayName(Common.legacyToComponent(StringUtil.CC(name)));
             }
 
             if (lore != null) {
-                itemMeta.setLore(StringUtil.CC(lore));
+                itemMeta.lore(StringUtil.CC(lore).stream()
+                        .map(Common::legacyToComponent)
+                        .collect(Collectors.toList()));
             }
             
             itemStack.setItemMeta(itemMeta);
@@ -246,6 +279,15 @@ public class GUIItem {
         return this;
     }
 
+    public GUIItem setBaseItem(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType() == Material.AIR) {
+            return this;
+        }
+        this.baseItemStack = itemStack.clone();
+        this.material = itemStack.getType();
+        return this;
+    }
+
     public GUIItem cloneItem() {
         GUIItem guiItem = new GUIItem();
         guiItem.setName(this.name);
@@ -256,6 +298,9 @@ public class GUIItem {
         guiItem.setUnbreakable(this.unbreakable);
         guiItem.setAmount(this.amount);
         guiItem.setDurability(this.durability);
+        if (this.baseItemStack != null) {
+            guiItem.baseItemStack = this.baseItemStack.clone();
+        }
         guiItem.itemFlags.addAll(this.itemFlags);
         guiItem.enchantments.putAll(this.enchantments);
         return guiItem;

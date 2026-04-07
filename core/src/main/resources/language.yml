@@ -1,4 +1,4 @@
-VERSION: 14
+VERSION: 38
 
 CONSOLE-NAME: "<red>Console"
 CANT-USE-CONSOLE: "<red>You can't use this command from the console."
@@ -29,6 +29,17 @@ COMMAND:
     CANT-YOURSELF: "<red>You can't ignore yourself."
     IGNORE-ON: "<green>You are now ignoring <yellow>%target%<green>."
     IGNORE-OFF: "<green>You are <red>no <green>longer ignoring <yellow>%target%<green>."
+  NICK:
+    HELP: "<red>/%label% [player] <formatted name> <gray>or <red>/%label% reset [player]"
+    TARGET-OFFLINE: "<red>%target% is not online."
+    SELF-NAME-LOCKED: "<red>You can only style your own name. The text must stay your real username."
+    DIFFERENT-NAME-NO-PERM: "<red>You can only style the real username. You need extra permission to set a different name."
+    SET-SELF: "<green>Your display name has been set to %name%<green>."
+    SET-OTHER: "<green>You set <yellow>%target%<green>'s display name to %name%<green>."
+    SET-BY: "<yellow>%player% <green>set your display name to %name%<green>."
+    RESET-SELF: "<green>Your display name has been reset to default."
+    RESET-OTHER: "<green>You reset <yellow>%target%<green>'s display name."
+    RESETED-BY: "<yellow>%player% <green>reset your display name."
   QUEUES:
     UNRANKED:
       NO-UNRANKED-LEFT: "<red>You have already played all your allowed unranked matches."
@@ -36,7 +47,17 @@ COMMAND:
     RANKED:
       NO-RANKED-LEFT: "<red>You have already played all your allowed ranked matches."
       LADDER-NOT-FOUND: "<red>Ladder %ladder% not found."
-      DIVISION-REQUIREMENT: "<red>Your division has to be at least %division_fullName% <red>to play ranked matches."
+      PROGRESS-HEADER: "<gold><bold>Progress towards Ranked:"
+      PROGRESS-EXP: " <gray>• <white>Experience: <yellow>%current%<gray>/<yellow>%required% <green>(%percent%%<green>)"
+      PROGRESS-WINS: " <gray>• <white>Wins: <yellow>%current%<gray>/<yellow>%required% <green>(%percent%%<green>)"
+    CUSTOM:
+      NO-PERMISSION: "<red>You don't have permission."
+      HELP: "<red>/customqueue <open|join|host <kit>|leave>"
+      HOST-USAGE: "<red>/customqueue host <kit>"
+      KIT-NOT-FOUND: "<red>Custom kit %kit% was not found or is not ready."
+      ALREADY-SEARCHING: "<yellow>You are already searching for a hosted custom kit."
+      ALREADY-HOSTING: "<yellow>You are already hosting a custom kit queue."
+      NOT-IN-CUSTOM-QUEUE: "<red>You are not in a custom kit queue."
   LEAVE:
     NOT-IN-MATCH: "<red>You are not in a match."
     CANT-LEAVE-DUEL-UNRANKED: "<red>You can't leave unranked duel matches."
@@ -546,6 +567,7 @@ COMMAND:
           - "<gray>Setup Commands:"
           - "<red> » <click:suggest_command:'/%label% sumo enable'><hover:show_text:'<gray>Enable the event.'>/%label% sumo enable"
           - "<red> » <click:suggest_command:'/%label% sumo disable'><hover:show_text:'<gray>Disable the event.'>/%label% sumo disable"
+          - "<red> » <click:suggest_command:'/%label% sumo setkit'><hover:show_text:'<gray>Set the kit for the event.'>/%label% sumo setkit"
           - ""
           - "<yellow>Note: <gray>Use <white>/setup event <gray>GUI to get the"
           - "<gray>Event Wand for corner & spawn position setup."
@@ -565,6 +587,8 @@ COMMAND:
         NO-WINNER: "<red>No one won the event in time."
         STARTED-SPECTATING: "<gray>%spectator% <yellow>started spectating the event."
         PLAYER-OUT: "<yellow>%player% <red>is out of the game."
+        CANT-EDIT: "<red>You cannot edit an enabled Event."
+        KIT-SET: "<green>You successfully set the kit for the sumo event."
       TNTTAG:
         COMMAND-HELP:
           - "<red><st>---------------------------------------"
@@ -604,6 +628,9 @@ COMMAND:
     INVALID-MATCH-ID: "<red>Match id is either invalid or it has expired."
     INVALID-PLAYER: "<red>Player statistics are not available for this match."
     INVALID-ROUND: "<red>Round cannot be found in statistics."
+  MATCH-HISTORY:
+    NO-HISTORY: "<red>This player has no match history yet."
+    PLAYER-NOT-FOUND: "<red>Player not found."
   PARTY:
     CANT-USE-COMMAND: "<red>You can't use this right now."
     ARGUMENTS:
@@ -808,6 +835,7 @@ COMMAND:
           - "<red><st>------------------------------------------------"
           - "<red>/%label% nametag prefix <player> <prefix> - Set the prefix."
           - "<red>/%label% nametag suffix <player> <suffix> - Set the suffix"
+          - "<red>/%label% nametag name <player> <name> - Set the MiniMessage name (chat/tab)."
           - "<red>/%label% nametag reset <player> - Reset the nametag of the player."
           - "<red><st>------------------------------------------------"
         TARGET-OFFLINE: "<red>%target% is not online."
@@ -817,7 +845,9 @@ COMMAND:
         PLAYER-PREFIX-SET: "<gold>%player% <yellow>set your prefix to %prefix%<yellow>."
         SUFFIX-SET: "<yellow>You set <gold>%target%'s <yellow>suffix to %suffix%<yellow>."
         PLAYER-SUFFIX-SET: "<gold>%player% <yellow>set your suffix to %suffix%<yellow>."
-        RELOADED: "<yellow>You reset <gold>%target%'s <yellow>nametag."
+        NAME-SET: "<yellow>You set <gold>%target%'s <yellow>name to %name%<yellow>."
+        PLAYER-NAME-SET: "<gold>%player% <yellow>set your name format to %name%<yellow>."
+        RELOADED: "<yellow>You reseted <gold>%target%'s <yellow>nametag."
         PLAYER-RELOADED: "<gold>%player% <yellow>has reset your nametag."
       TELEPORT:
         COMMAND-HELP: "<red>/%label% teleport <world>"
@@ -994,7 +1024,7 @@ ARENA:
   ARENA-REGEN-FAILED-CHEST: "<red>Arena regen failed to save chest contents."
   SELECTOR:
     LADDER-NOT-AVAILABLE: "<red>This ladder is not available anymore."
-    LADDER-FROZEN: "<red>This ladder is frozen, so you cannot start a new game with it anymore."
+    LADDER-FROZEN: "<red>This ladder is frozen, so you cannot start a new game with it."
     DUEL:
       TARGET-LEFT: "<red>Player has left the server."
       ARENA-NOT-AVAILABLE: "<red>This arena is not available anymore."
@@ -1062,6 +1092,7 @@ LADDER:
       NO-AVAILABLE-ARENA: "<red>There is no available arena for your game."
       ERROR: "<red>Something went wrong."
       TARGET-PARTY-DISBANDED: "<red>The target party has been disbanded."
+      NO-CUSTOM-KIT-SELECTED: "<red>You need to select a custom kit first."
   LADDER-TYPES:
     BASIC:
       NAME: "Basic"
@@ -1093,6 +1124,15 @@ LADDER:
         - "<gray>water or void. In addition, build "
         - "<gray>is disabled and players life and "
         - "<gray>food levels do not go down."
+        - "<dark_gray><st>----------------------------------"
+    TNT-SUMO:
+      NAME: "TNT Sumo"
+      DESCRIPTION:
+        - "<dark_gray><st>----------------------------------"
+        - "<gray>TNT explodes instantly on placement"
+        - "<gray>with custom knockback physics."
+        - "<gray>Only player-placed blocks are destroyed"
+        - "<gray>and returned to their owner."
         - "<dark_gray><st>----------------------------------"
     BOXING:
       NAME: "Boxing"
@@ -1152,6 +1192,15 @@ LADDER:
         - "<gray>and tnt do no damage to the players,"
         - "<gray>but push them very far back."
         - "<dark_gray><st>----------------------------------"
+    MLG-RUSH:
+      NAME: "MLG Rush"
+      DESCRIPTION:
+        - "<dark_gray><st>----------------------------------"
+        - "<gray>Fast bed-rush gamemode where breaking"
+        - "<gray>the enemy bed scores one point instantly."
+        - "<gray>Players respawn immediately with no"
+        - "<gray>health damage, only knockback."
+        - "<dark_gray><st>----------------------------------"
     BRIDGES:
       NAME: "Bridges"
       DESCRIPTION:
@@ -1187,6 +1236,16 @@ DUEL-ROUND-SELECTOR:
   PARTY-RANDOM-ERROR: "<red>There was an error happened contact discord."
   ENEMY-PARTY-OFFLINE: "<red>Enemy party not available."
 EVENT:
+  DUEL:
+    EVENT-ROUND-WON-TITLE: "<green><bold>VICTORY!"
+    EVENT-ROUND-WON-SUBTITLE: "<gray>You won this round!"
+    EVENT-ROUND-LOST-TITLE: "<red><bold>DEFEAT..."
+    EVENT-ROUND-LOST-SUBTITLE: "<gray>Better luck next time!"
+    EVENT-MATCH-WON-TITLE: "<gold><bold>TOURNAMENT WINNER!"
+    EVENT-MATCH-WON-SUBTITLE: "<yellow>Congratulations on winning the event!"
+    EVENT-FIGHT-WON-TITLE: "<aqua>%winner% <gray>won the round"
+    POST-KILL-COUNTDOWN-TITLE: "<yellow>Next round in"
+    POST-KILL-COUNTDOWN-SUBTITLE: "<red>%seconds% <gray>%secondName%"
   EVENT-QUEUE-STARTED-PLAYER: "<red>%player% <gray>started the <yellow>%event% <gray>event. <click:run_command:/event join><hover:show_text:'<green>Click here <yellow>to join the event.'><yellow>Join Event</hover></click>"
   EVENT-QUEUE-STARTED-CONSOLE: "<red>%consoleName% <gray>started the <yellow>%event% <gray>event. <click:run_command:/event join><hover:show_text:'<green>Click here <yellow>to join the event.'><yellow>Join Event</hover></click>"
   EVENT-CANT-START-ONTIME: "<red>Unfortunately the event could not start on time, so it was cancelled."
@@ -1215,7 +1274,6 @@ EVENT:
     POSITION-MARKERS-DELETED: "<red>The position markers have been deleted!"
     ALREADY-SCANNING: "<red>The <yellow>%event% <red>event's map is already being scanned."
     ENDERPEARL-COOLDOWN: "<red>You cannot use this for another <yellow>%seconds% <red>%secondName%."
-    FIREWORK-ROCKET-COOLDOWN: "<red>You cannot use firework rockets for another <yellow>%seconds% <red>%secondName%."
 PARTY:
   NO-PERMISSION: "<red>You don't have permission."
   ALREADY-PARTY: "<red>You are already in a different party."
@@ -1232,6 +1290,7 @@ PARTY:
   NOT-LEADER: "<red>You are not the leader of the party."
   CANT-DECREASE-LIMIT: "<red>You can't decrease the limit further than the number of players in the party."
   PARTY-NOT-PUBLIC: "<red>You have to have a public party for that."
+  NO-BROADCAST-LEFT: "<red>You have reached your daily party broadcast limit."
   CANT-DUEL-OWN-PARTY: "<red>You can't duel your own party."
   CANT-USE-PARTY-CHAT: "<red>You can't use party chat right now."
   CANT-DUEL-PARTY: "<red>You can't duel this party."
@@ -1289,6 +1348,11 @@ PROFILE:
     DAY: "Day"
     SUNSET: "Sunset"
     NIGHT: "Night"
+  PREFIX-VISIBILITY-NAMES:
+    NONE: "None"
+    PREFIX: "Prefix"
+    SUFFIX: "Suffix"
+    PREFIX-AND-SUFFIX: "Prefix and Suffix"
   GROUP-PERMISSION-NAME: "Permission for the %group% player group."
   INACTIVITY-REMOVED: "<red>%count% <yellow>profile got removed because of inactivity."
   NO-GROUP: "<red>You don't have a group."
@@ -1318,6 +1382,22 @@ QUEUES:
     HIGH-PING: "<red>Your ping is too high for ranked queue."
     BANNED: "<red>You are banned from playing ranked matches. Reason: <yellow>%reason%"
     NO-REASON: "NULL"
+  CUSTOM:
+    NO-PERMISSION: "<red>You don't have permission."
+    NO-SAVED-KITS: "<red>You do not have any saved custom kits ready to host."
+    KIT-NOT-READY: "<red>This custom kit is not ready for queueing."
+    HOSTED: "<green>You are now hosting a custom queue with <yellow>%kit%<green>."
+    CANCELLED: "<yellow>You cancelled your hosted custom queue."
+    WAITING-FOR-HOST: "<yellow>Waiting in queue for someone to host a custom kit..."
+    SEARCH-CANCELLED: "<yellow>You left the custom-kit host queue."
+    SEARCHING-ACTIONBAR: "<yellow>Searching hosted custom kits... <gray>%elapsed%"
+    HOSTING-ACTIONBAR: "<yellow>Hosting custom kit <gold>%kit% <gray>%elapsed%"
+    JOINED: "<green>You joined <yellow>%player%<green>'s hosted queue using <yellow>%kit%<green>."
+    MATCH-FOUND: "<green><yellow>%player% <green>joined your hosted custom queue."
+  MULTI:
+    CANT-MIX-TYPES: "<red>You cannot mix ranked and unranked ladders in multi-queue."
+    MAX-LADDERS: "<red>You can only queue for <yellow>%max% <red>ladders at once."
+    SIDEBAR-MULTIPLE: "Multiple Ladders"
   QUEUE-START: "<green>You are now queued for %weightClass% %ladder%<green>."
   QUEUE-STOPPED: "<green>You are no longer queued for %weightClass% %ladder%<green>."
   LADDER-FROZEN: "<red>%ladder% ladder is no longer available."
@@ -1325,10 +1405,27 @@ QUEUES:
   NO-AVAILABLE-ARENA: "<red>Can't find available arena!"
   NO-MATCH-IN-TIME: "<red>We couldn't find a match in %maxTime% minutes."
 MATCH:
+  START-TITLES:
+    COUNTDOWN: "<red><bold>%remaining%"
+    FIGHT: "<gold><bold>Fight!"
+  END-TITLES:
+    MATCH:
+      VICTORY: "<green><bold>Victory!"
+      DEFEAT: "<red><bold>Defeat!"
+      SUBTITLE-VICTORY: "<gray>Final score: <green>%winnerScore% <dark_gray>- <red>%loserScore%"
+      SUBTITLE-DEFEAT: "<gray>Final score: <green>%winnerScore% <dark_gray>- <red>%loserScore%"
+    ROUND:
+      VICTORY: "<green><bold>Victory!"
+      DEFEAT: "<red><bold>Defeat!"
+      SUBTITLE-PLAYER: "<gray><yellow>%winner% <dark_gray>(<green>%winnerScore%<dark_gray>) <gray>- <dark_gray>(<red>%loserScore%<dark_gray>) <yellow>%loser%"
+      SUBTITLE-TEAM: "<gray><yellow>%scoredTeam% <gray>scored <dark_gray>| <gray>%team1Name% <white>%team1Score% <dark_gray>- <white>%team2Score% <gray>%team2Name%"
   COOLDOWN:
     ENDER-PEARL: "<red>You cannot use this for another <yellow>%seconds% <red>%secondName%."
     GOLDEN-APPLE: "<red>You cannot eat another <gold>golden apple</gold> for another <yellow>%seconds% <red>%secondName%."
     FIREBALL: "<red>You cannot throw another fireball for another <yellow>%seconds% <red>%secondName%."
+    FIREWORK-ROCKET-COOLDOWN: "<red>You cannot use firework rockets for another <yellow>%seconds% <red>%secondName%."
+  ACTIONBAR:
+    TNT-SUMO-TNT-EARN: "<yellow><bold>+1 TNT <gray>(Attack)"
   CANT-BUILD-OUTSIDE-ARENA: "<red>You can't build outside the arena."
   CANT-BUILD-OVER-LIMIT: "<red>You can't build there."
   CANT-CRAFT: "<red>You can't craft with this ladder."
@@ -1339,6 +1436,7 @@ MATCH:
   ONLY-CHARGE-WIND: "<red>You can only use wind charge in build ladders."
   REACHED-NEW-DIVISION: "<green>Congratulations! <yellow>You have reached %newDivision_fullName% <yellow>division." # %oldDivision_fullName% & %newDivision_fullName%
   MATCH-OVER-IN-30: "<yellow>Match is over in <red>30 <yellow>seconds."
+  ARENA-ROLLING-BACK: "<yellow>Rolling back arena... <gray>Waiting for next round to start."
   REMATCH-REQUEST:
     TARGET-OFFLINE: "<red>%target% has left the server."
     ALREADY-SENT: "<red>The rematch request has already been sent out."
@@ -1358,6 +1456,10 @@ MATCH:
         PLAYER-RESPAWNED: "%teamColor%%player% <yellow>has <green>respawned<yellow>."
         BED-DESTROYED: "%team% team's &ebed has been destroyed!"
       FIREBALL-FIGHT:
+        RESPAWN: "<yellow>You will respawn in <red>%seconds% <yellow>%secondName%."
+        PLAYER-RESPAWNED: "%teamColor%%player% <yellow>has <green>respawned<yellow>."
+        BED-DESTROYED: "%team% team's &ebed has been destroyed!"
+      MLG-RUSH:
         RESPAWN: "<yellow>You will respawn in <red>%seconds% <yellow>%secondName%."
         PLAYER-RESPAWNED: "%teamColor%%player% <yellow>has <green>respawned<yellow>."
         BED-DESTROYED: "%team% team's &ebed has been destroyed!"
@@ -1411,41 +1513,9 @@ MATCH:
         - "%spectatorExtension%"
         - "<gray><st>----------------------------------------"
         - "%rankedExtension%"
-  BOT-DUEL:
-    PLAYER-LEFT: "<red>%player% <yellow>left the match."
-    START:
-      MATCH-STARTING: "<yellow>Match is starting in <gold>%seconds% <yellow>%secondName%."
-      MATCH-STARTED: "<green>Match has been started."
-      ROUND-STARTING: "<yellow>Round is starting in <gold>%seconds% <yellow>%secondName%."
-      ROUND-STARTED: "<green>Round has been started."
-    MATCH-START:
-      - "<gray><st>----------------------------------------"
-      - "%matchTypeName%"
-      - ""
-      - " <yellow>» Kit: <white>%ladder%"
-      - " <yellow>» Map: <white>%arena%"
-      - " <yellow>» Rounds: <white>%rounds%"
-      - ""
-      - "<gold>%player% <gray>vs <light_purple>PvpBot"
-      - "<gray><st>----------------------------------------"
-    MATCH-END-WIN:
-      - "<gray><st>----------------------------------------"
-      - "<green>%player% <yellow>defeated the <light_purple>PvpBot<yellow>!"
-      - "<gray><st>----------------------------------------"
-    MATCH-END-LOSS:
-      - "<gray><st>----------------------------------------"
-      - "<light_purple>PvpBot <yellow>defeated <red>%player%<yellow>!"
-      - "<gray><st>----------------------------------------"
-    MATCH-END-ROUND:
-      - "<gray><st>----------------------------------------"
-      - "%player% <yellow>has <green>won <yellow>the round. <light_purple>%round% <yellow>more to win the match."
-      - "<gray><st>----------------------------------------"
-    MATCH-END-ROUND-BOT-WIN:
-      - "<gray><st>----------------------------------------"
-      - "<light_purple>PvpBot <yellow>has <green>won <yellow>the round."
-      - "<gray><st>----------------------------------------"
   PARTY-FFA:
     PLAYER-LEFT: "<red>%player% <yellow>left the match."
+    PLAYER-DIE: "<red>%player% <yellow>has been eliminated. <gray>(%alivePlayers% players remaining)"
     START:
       MATCH-STARTING: "<yellow>Match is starting in <gold>%seconds% <yellow>%secondName%."
       MATCH-STARTED: "<green>Match has been started."
@@ -1499,6 +1569,10 @@ MATCH:
         PLAYER-RESPAWNED: "%teamColor%%player% <yellow>has <green>respawned<yellow>."
         BED-DESTROYED: "%team% team's &ebed has been destroyed!"
       FIREBALL-FIGHT:
+        RESPAWN: "<yellow>You will respawn in <red>%seconds% <yellow>%secondName%."
+        PLAYER-RESPAWNED: "%teamColor%%player% <yellow>has <green>respawned<yellow>."
+        BED-DESTROYED: "%team% team's &ebed has been destroyed!"
+      MLG-RUSH:
         RESPAWN: "<yellow>You will respawn in <red>%seconds% <yellow>%secondName%."
         PLAYER-RESPAWNED: "%teamColor%%player% <yellow>has <green>respawned<yellow>."
         BED-DESTROYED: "%team% team's &ebed has been destroyed!"
@@ -1562,6 +1636,11 @@ MATCH:
         RESPAWN: "<yellow>You will respawn in <red>%seconds% <yellow>%secondName%."
         PLAYER-RESPAWNED: "%teamColor%%player% <yellow>has <green>respawned<yellow>."
         BED-DESTROYED: "%team% team's &ebed has been destroyed!"
+      MLG-RUSH:
+        PLAYER-DIED: "%teamColor%%player% <yellow>has <red>died<yellow>."
+        RESPAWN: "<yellow>You will respawn in <red>%seconds% <yellow>%secondName%."
+        PLAYER-RESPAWNED: "%teamColor%%player% <yellow>has <green>respawned<yellow>."
+        BED-DESTROYED: "%team% team's &ebed has been destroyed!"
       BATTLE-RUSH:
         PLAYER-DIED: "%teamColor%%player% <yellow>has <red>died<yellow>."
         RESPAWN: "<yellow>You will respawn in <red>%seconds% <yellow>%secondName%."
@@ -1621,12 +1700,16 @@ FFA:
       CANT-JOIN-FFA: "<red>You can't spectate the FFA right now."
     LEAVE:
       NOT-IN-FFA: "<red>You are not in a FFA."
+    KIT:
+      NOT-IN-FFA: "<red>You are not in a FFA."
+      ALREADY-IN-KIT: "<red>You are already in this kit."
     HELP:
       - "<gray><st>----------------------------------------"
       - "<dark_aqua><bold>FFA Commands"
       - ""
-      - " <yellow>» <white>/%label% join <arena> <gray>- <white>Join the FFA."
-      - " <yellow>» <white>/%label% leave <gray>- <white>Leave the FFA."
+      - " <yellow>» <white>/%label% join <gray>- <white>Join a FFA."
+      - " <yellow>» <white>/%label% leave <gray>- <white>Leave a FFA."
+      - " <yellow>» <white>/%label% kit <gray>- <white>Open FFA kit selector."
       - " <yellow>» <white>/%label% spectate <arena> <gray>- <white>Spectate FFA."
       - " <yellow>» <white>/%label% list <gray>- <white>List all available arenas."
       - "<gray><st>----------------------------------------"
@@ -1653,6 +1736,7 @@ FFA:
 FIGHT:
   DEATH-MESSAGES:
     VOID: "<red>%player% <yellow>fell into the void."
+    VOID-BY-PLAYER: "<red>%player% <yellow>was knocked into the void by <gold>%killer%<yellow>."
     WATER: "<red>%player% <yellow>drowned."
     LAVA: "<red>%player% <yellow>burned in lava."
     FIRE: "<red>%player% <yellow>burned to death."

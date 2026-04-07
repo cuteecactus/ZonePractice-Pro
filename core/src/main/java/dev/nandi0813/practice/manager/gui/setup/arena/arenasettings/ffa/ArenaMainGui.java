@@ -72,8 +72,8 @@ public class ArenaMainGui extends GUI {
                 .replace("%arenaDisplayName%", ffaArena.getDisplayName())
                 .replace("%arenaName%", ffaArena.getName())
                 .replace("%arenaType%", ffaArena.getType().toString())
-                .setMaterial(ffaArena.getIcon() != null && ffaArena.getIcon().getType() != null ? ffaArena.getIcon().getType() : null)
-                .setDamage(ffaArena.getIcon() != null && ffaArena.getIcon().getDurability() != 0 ? ffaArena.getIcon().getDurability() : -1)
+                .setMaterial(ffaArena.getIcon() != null ? ffaArena.getIcon().getType() : null)
+                .setDamage(ffaArena.getIcon() != null && Common.getItemDamage(ffaArena.getIcon()) != 0 ? Common.getItemDamage(ffaArena.getIcon()) : -1)
                 .get());
 
         inventory.setItem(11, ffaArena.isEnabled() ? STATUS_ENABLED_ITEM : STATUS_DISABLED_ITEM);
@@ -138,6 +138,10 @@ public class ArenaMainGui extends GUI {
                 GUIManager.getInstance().searchGUI(GUIType.Arena_Summary).open(player);
                 break;
             case 31:
+                if (!ffaArena.isEnabled() && ffaArena.isReadyToEnable()) {
+                    ArenaUtil.changeStatus(player, ffaArena);
+                }
+
                 if (ffaArena.isEnabled()) {
                     FFA ffa = ffaArena.getFfa();
 

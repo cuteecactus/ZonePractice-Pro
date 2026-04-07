@@ -6,9 +6,12 @@ import dev.nandi0813.practice.manager.inventory.InventoryManager;
 import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
+import dev.nandi0813.practice.manager.profile.cosmetics.armortrim.CosmeticsPermissionSanitizer;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
 import dev.nandi0813.practice.manager.sidebar.SidebarManager;
+import dev.nandi0813.practice.telemetry.transport.stats.PracticeStatsTelemetryLogger;
 import dev.nandi0813.practice.util.PermanentConfig;
+import dev.nandi0813.practice.util.UpdateChecker;
 import dev.nandi0813.practice.util.playerutil.PlayerUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -30,12 +33,16 @@ public class PlayerJoin implements Listener {
         if (profile == null)
             profile = ProfileManager.getInstance().newProfile(player, uuid);
 
+        // Ensure action-bar state from any previous session is fully reset before new queue/status flows start.
+        profile.getActionBar().resetForReconnect();
+
         profile.checkGroup();
 
         // Send nametag teams
         NametagManager.getInstance().sendTeams(player);
 
         profile.setLastJoin(System.currentTimeMillis());
+        PracticeStatsTelemetryLogger.markDirty(profile);
 
         // Check how many custom kits the player is allowed to save.
         int customKitPerm = profile.getCustomKitPerm();
@@ -59,6 +66,24 @@ public class PlayerJoin implements Listener {
             ProfileManager.getInstance().getProfile(player).setStatus(ProfileStatus.OFFLINE);
             SidebarManager.getInstance().unLoadSidebar(player);
         }
+
+        // Notify operators about available updates (delayed so the player is fully in the world)
+        Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () ->
+                UpdateChecker.notifyPlayer(player), 40L);
+
+        // Revalidate saved cosmetics after permission plugins have finished loading player nodes.
+        Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+
+            Profile liveProfile = ProfileManager.getInstance().getProfile(player);
+            if (liveProfile == null) {
+                return;
+            }
+
+            CosmeticsPermissionSanitizer.sanitize(player, liveProfile);
+        }, 40L);
     }
 
 }

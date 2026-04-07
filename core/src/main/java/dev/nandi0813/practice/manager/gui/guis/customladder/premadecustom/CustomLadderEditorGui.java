@@ -5,6 +5,7 @@ import dev.nandi0813.practice.manager.backend.GUIFile;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.fight.match.enums.WeightClass;
 import dev.nandi0813.practice.manager.fight.match.util.CustomKit;
+import dev.nandi0813.practice.manager.fight.util.PlayerUtil;
 import dev.nandi0813.practice.manager.gui.GUI;
 import dev.nandi0813.practice.manager.gui.GUIManager;
 import dev.nandi0813.practice.manager.gui.GUIType;
@@ -14,15 +15,14 @@ import dev.nandi0813.practice.manager.ladder.enums.WeightClassType;
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
-import dev.nandi0813.practice.module.interfaces.ItemCreateUtil;
-import dev.nandi0813.practice.module.util.ClassImport;
-import dev.nandi0813.practice.module.util.VersionChecker;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.InventoryUtil;
+import dev.nandi0813.practice.util.ItemCreateUtil;
 import dev.nandi0813.practice.util.StringUtil;
 import dev.nandi0813.practice.util.cooldown.CooldownObject;
 import dev.nandi0813.practice.util.cooldown.PlayerCooldown;
 import lombok.Getter;
+import net.kyori.adventure.text.Component;
 import org.apache.commons.lang3.StringUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -87,68 +87,60 @@ public class CustomLadderEditorGui extends GUI {
 
     @Override
     public void update() {
-        Bukkit.getScheduler().runTaskAsynchronously(ZonePractice.getInstance(), () ->
-        {
-            Inventory inventory = gui.get(1);
-            inventory.clear();
+        Inventory inventory = gui.get(1);
+        inventory.clear();
 
-            List<ItemStack> armorContent = new ArrayList<>(Arrays.asList(ladder.getKitData().getArmor()));
-            for (int i : new int[]{18, 27, 36, 45}) {
-                if (armorContent.get(Math.abs(i / 9 - 5)) != null)
-                    inventory.setItem(i, armorContent.get(Math.abs(i / 9 - 5)));
-                else
-                    inventory.setItem(i, GUIManager.getDUMMY_ITEM());
+        List<ItemStack> armorContent = new ArrayList<>(Arrays.asList(ladder.getKitData().getArmor()));
+        for (int i : new int[]{18, 27, 36, 45}) {
+            if (armorContent.get(Math.abs(i / 9 - 5)) != null)
+                inventory.setItem(i, armorContent.get(Math.abs(i / 9 - 5)));
+            else
+                inventory.setItem(i, GUIManager.getDUMMY_ITEM());
+        }
+
+        ItemStack infoItem = GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.INFO")
+                .replace("%kit%", String.valueOf(this.kit))
+                .replace("%weightClass%", (ranked ? WeightClass.RANKED.getName() : WeightClass.UNRANKED.getName()))
+                .replace("%ladder%", ladder.getDisplayName())
+                .replace("%ladderOriginal%", ladder.getName())
+                .get();
+        inventory.setItem(0, infoItem);
+
+        inventory.setItem(6, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.SAVE").get());
+        inventory.setItem(7, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.LOAD-DEFAULT").get());
+        inventory.setItem(8, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.CANCEL").get());
+
+        // Frame
+        for (int i : new int[]{1, 3, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 28, 37, 46}) {
+            inventory.setItem(i, GUIManager.getFILLER_ITEM());
+        }
+
+        inventory.setItem(2, getRankedItem());
+        inventory.setItem(4, getEffectItem());
+
+        if (ladder.getCustomKitExtraItems().get(ranked) != null) {
+            for (ItemStack item : ladder.getCustomKitExtraItems().get(ranked)) {
+                inventory.setItem(inventory.firstEmpty(), Objects.requireNonNullElseGet(item, GUIManager::getDUMMY_ITEM));
             }
+        }
 
-            ItemStack infoItem = GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.INFO")
-                    .replace("%kit%", String.valueOf(this.kit))
-                    .replace("%weightClass%", (ranked ? WeightClass.RANKED.getName() : WeightClass.UNRANKED.getName()))
-                    .replace("%ladder%", ladder.getDisplayName())
-                    .replace("%ladderOriginal%", ladder.getName())
-                    .get();
-            inventory.setItem(0, infoItem);
+        inventory.remove(GUIManager.getDUMMY_ITEM());
 
-            inventory.setItem(6, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.SAVE").get());
-            inventory.setItem(7, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.LOAD-DEFAULT").get());
-            inventory.setItem(8, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.CANCEL").get());
+        for (int i = 0; i < inventory.getSize(); i++)
+            if (inventory.getItem(i) == null)
+                inventory.setItem(i, fillerItem);
 
-            // Frame
-            for (int i : new int[]{1, 3, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 28, 37, 46}) {
-                inventory.setItem(i, GUIManager.getFILLER_ITEM());
+        if (customKit.getExtra() != null) {
+            if (customKit.getExtra().length > 0) {
+                inventory.setItem(14, customKit.getExtra()[0]);
+            } else {
+                inventory.setItem(14, null);
             }
+        } else {
+            inventory.setItem(14, GUIManager.getDUMMY_ITEM());
+        }
 
-            inventory.setItem(2, getRankedItem());
-            inventory.setItem(4, getEffectItem());
-
-            if (ladder.getCustomKitExtraItems().get(ranked) != null) {
-                for (ItemStack item : ladder.getCustomKitExtraItems().get(ranked)) {
-                    if (item != null)
-                        inventory.setItem(inventory.firstEmpty(), item);
-                    else
-                        inventory.setItem(inventory.firstEmpty(), GUIManager.getDUMMY_ITEM());
-                }
-            }
-
-            inventory.remove(GUIManager.getDUMMY_ITEM());
-
-            for (int i = 0; i < inventory.getSize(); i++)
-                if (inventory.getItem(i) == null)
-                    inventory.setItem(i, fillerItem);
-
-            if (Objects.requireNonNull(VersionChecker.getBukkitVersion()).isSecondHand()) {
-                if (customKit.getExtra() != null) {
-                    if (customKit.getExtra().length > 0) {
-                        inventory.setItem(14, customKit.getExtra()[0]);
-                    } else {
-                        inventory.setItem(14, null);
-                    }
-                } else {
-                    inventory.setItem(14, GUIManager.getDUMMY_ITEM());
-                }
-            }
-
-            updatePlayers();
-        });
+        updatePlayers();
     }
 
     @Override
@@ -207,14 +199,12 @@ public class CustomLadderEditorGui extends GUI {
         NormalLadder ladder = customLadderEditorGui.getLadder();
 
         if (ladder.isEnabled() && ladder.isEditable() && !ladder.isFrozen()) {
-            ItemStack[] inventoryStorageContent = ClassImport.getClasses().getPlayerUtil().getInventoryStorageContent(player);
+            ItemStack[] inventoryStorageContent = PlayerUtil.getInventoryStorageContent(player);
             customKit.setInventory(inventoryStorageContent);
-            if (Objects.requireNonNull(VersionChecker.getBukkitVersion()).isSecondHand()) {
-                customKit.setExtra(new ItemStack[]{this.gui.get(1).getItem(14)});
-            }
+            customKit.setExtra(new ItemStack[]{this.gui.get(1).getItem(14)});
         }
 
-        ClassImport.getClasses().getPlayerUtil().clearInventory(player);
+        PlayerUtil.clearInventory(player);
 
         Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () ->
         {
@@ -234,7 +224,7 @@ public class CustomLadderEditorGui extends GUI {
         Profile playerProfile = ProfileManager.getInstance().getProfile(player);
         playerProfile.setStatus(ProfileStatus.EDITOR);
 
-        ClassImport.getClasses().getPlayerUtil().clearInventory(player);
+        PlayerUtil.clearInventory(player);
 
         Map<Integer, CustomKit> kits;
         if (ranked) kits = profile.getRankedCustomKits().get(ladder);
@@ -246,13 +236,10 @@ public class CustomLadderEditorGui extends GUI {
             player.getInventory().setContents(ladder.getKitData().getStorage());
     }
 
-
     private @Nullable ItemStack getRankedItem() {
         switch (ladder.getWeightClass()) {
-            case UNRANKED:
-                return GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.ONLY-UNRANKED").replace("%weightClass%", WeightClass.UNRANKED.getName()).get();
-            case RANKED:
-                return GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.ONLY-RANKED").replace("%weightClass%", WeightClass.RANKED.getName()).get();
+            case UNRANKED, RANKED:
+                return GUIManager.getFILLER_ITEM();
             case UNRANKED_AND_RANKED:
                 if (this.ranked)
                     return GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.SWITCH-TO-UNRANKED").replace("%weightClass%", WeightClass.UNRANKED.getName()).get();
@@ -267,7 +254,7 @@ public class CustomLadderEditorGui extends GUI {
             List<String> effects = new ArrayList<>();
             for (PotionEffect potionEffect : ladder.getKitData().getEffects()) {
                 effects.add(GUIFile.getString("GUIS.KIT-EDITOR.KIT-EDITOR.ICONS.HAS-EFFECT.FORMAT")
-                        .replace("%name%", StringUtils.capitalize(potionEffect.getType().getName().replace("_", " ").toLowerCase()))
+                        .replace("%name%", StringUtils.capitalize(potionEffect.getType().getKey().getKey().replace("_", " ").toLowerCase()))
                         .replace("%amplifier%", String.valueOf(potionEffect.getAmplifier() + 1))
                         .replace("%time%", StringUtil.formatMillisecondsToMinutes((potionEffect.getDuration() / 20) * 1000L))
                 );
@@ -278,11 +265,12 @@ public class CustomLadderEditorGui extends GUI {
             ItemCreateUtil.hideItemFlags(effectItemMeta);
 
             List<String> lore = new ArrayList<>();
-            for (String line : effectItem.getItemMeta().getLore()) {
+            for (Component lineComponent : Objects.requireNonNull(effectItem.getItemMeta().lore())) {
+                String line = Common.serializeComponentToLegacyString(lineComponent);
                 if (line.contains("%effects%")) lore.addAll(effects);
                 else lore.add(line);
             }
-            effectItemMeta.setLore(lore);
+            effectItemMeta.lore(lore.stream().map(Common::legacyToComponent).toList());
             effectItem.setItemMeta(effectItemMeta);
             return effectItem;
         } else {

@@ -2,6 +2,7 @@ package dev.nandi0813.practice.manager.playerkit.guis;
 
 import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
+import dev.nandi0813.practice.manager.fight.util.PlayerUtil;
 import dev.nandi0813.practice.manager.gui.GUI;
 import dev.nandi0813.practice.manager.gui.GUIManager;
 import dev.nandi0813.practice.manager.gui.GUIType;
@@ -14,9 +15,10 @@ import dev.nandi0813.practice.manager.playerkit.StaticItems;
 import dev.nandi0813.practice.manager.playerkit.items.KitItem;
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.InventoryUtil;
+import dev.nandi0813.practice.manager.playerkit.guis.ShulkerBoxEditorGUI;
+import dev.nandi0813.practice.manager.playerkit.guis.ShulkerCategoryGUI;
 import net.wesjd.anvilgui.AnvilGUI;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -91,6 +93,17 @@ public class MainGUI extends GUI {
 
         if (kitItems.getSlots().containsKey(slot)) {
             KitItem kitItem = kitItems.getSlots().get(slot);
+
+            // Any click on a shulker box opens the contents editor
+            if (!kitItem.isNull() && ShulkerCategoryGUI.isShulkerBox(kitItem.getMaterial())) {
+                if (e.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) {
+                    kitItem.reset();
+                    this.update();
+                } else {
+                    new ShulkerBoxEditorGUI(this, kitItem).open(player);
+                }
+                return;
+            }
 
             switch (e.getClick()) {
                 case LEFT:
@@ -217,7 +230,7 @@ public class MainGUI extends GUI {
     public void open(Player player) {
         super.open(player);
 
-        ClassImport.getClasses().getPlayerUtil().setActiveInventoryTitle(
+        PlayerUtil.setActiveInventoryTitle(
                 player,
                 StaticItems.MAIN_GUI_TITLE.replace("%name%", customLadder.getDisplayName())
         );
@@ -231,7 +244,7 @@ public class MainGUI extends GUI {
             return false;
         }
 
-        for (Enchantment enchantment : Enchantment.values()) {
+        for (Enchantment enchantment : Common.getAllEnchantments()) {
             if (enchantment.canEnchantItem(itemStack)) {
                 return true;
             }

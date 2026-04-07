@@ -22,9 +22,11 @@ public class CustomLadder extends Ladder {
     private static final boolean DEFAULT_HUNGER = PlayerKitManager.getInstance().getBoolean("DEFAULT-SETTINGS.HUNGER");
     private static final boolean DEFAULT_BUILD = PlayerKitManager.getInstance().getBoolean("DEFAULT-SETTINGS.BUILD");
     private static final int DEFAULT_ROUNDS = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.ROUNDS");
-    private static final int DEFAULT_HITDELAY = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.HITDELAY");
-    private static final int DEFAULT_EP_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.EP_COOLDOWN");
-    private static final int DEFAULT_GA_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.GA_COOLDOWN");
+    private static final double DEFAULT_HITDELAY = convertHitDelayToMultiplier(PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.HITDELAY"));
+    private static final double DEFAULT_EP_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.EP_COOLDOWN");
+    private static final double DEFAULT_GA_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.GA_COOLDOWN");
+    private static final double DEFAULT_WIND_CHARGE_COOLDOWN = PlayerKitManager.getInstance().getInt("DEFAULT-SETTINGS.WIND_CHARGE_COOLDOWN");
+    private static final boolean DEFAULT_HEALTH_BELOW_NAME = PlayerKitManager.getInstance().getBoolean("DEFAULT-SETTINGS.HEALTH_BELOW_NAME");
 
     private static final String NAME_PATH = ".settings.name";
     private static final String REGEN_PATH = ".settings.regen";
@@ -35,6 +37,8 @@ public class CustomLadder extends Ladder {
     private static final String KNOCKBACK_PATH = ".settings.knockback";
     private static final String EP_COOLDOWN_PATH = ".settings.ep-cooldown";
     private static final String GA_COOLDOWN_PATH = ".settings.ga-cooldown";
+    private static final String WIND_CHARGE_COOLDOWN_PATH = ".settings.wind-charge-cooldown";
+    private static final String HEALTH_BELOW_NAME_PATH = ".settings.health-below-name";
     private static final String KIT_DATA_PATH = ".kit-data";
 
     private final MainGUI mainGUI;
@@ -59,9 +63,11 @@ public class CustomLadder extends Ladder {
         this.setHunger(DEFAULT_HUNGER);
         this.setBuild(DEFAULT_BUILD);
         this.setRounds(DEFAULT_ROUNDS);
-        this.setHitDelay(DEFAULT_HITDELAY);
+        this.setAttackCooldownModifier(DEFAULT_HITDELAY);
         this.setEnderPearlCooldown(DEFAULT_EP_COOLDOWN);
         this.setGoldenAppleCooldown(DEFAULT_GA_COOLDOWN);
+        this.setWindChargeCooldown(DEFAULT_WIND_CHARGE_COOLDOWN);
+        this.setHealthBelowName(DEFAULT_HEALTH_BELOW_NAME);
         this.matchTypes = new ArrayList<>(MATCH_TYPES);
 
         this.getData();
@@ -88,10 +94,18 @@ public class CustomLadder extends Ladder {
         if (config.isBoolean(mapPath + HUNGER_PATH)) hunger = config.getBoolean(mapPath + HUNGER_PATH);
         if (config.isBoolean(mapPath + BUILD_PATH)) this.setBuild(config.getBoolean(mapPath + BUILD_PATH));
         if (config.isInt(mapPath + ROUNDS_PATH)) rounds = config.getInt(mapPath + ROUNDS_PATH);
-        if (config.isInt(mapPath + HITDELAY_PATH)) hitDelay = config.getInt(mapPath + HITDELAY_PATH);
+        // Handle both legacy int and new double hitdelay values
+        if (config.isDouble(mapPath + HITDELAY_PATH)) {
+            double value = config.getDouble(mapPath + HITDELAY_PATH);
+            attackCooldownModifier = Math.clamp(value, 0, 3.0);
+        } else if (config.isInt(mapPath + HITDELAY_PATH)) {
+            attackCooldownModifier = convertHitDelayToMultiplier(config.getInt(mapPath + HITDELAY_PATH));
+        }
         if (config.isString(mapPath + KNOCKBACK_PATH)) ladderKnockback.get(config.getString(mapPath + KNOCKBACK_PATH));
         if (config.isInt(mapPath + EP_COOLDOWN_PATH)) enderPearlCooldown = config.getInt(mapPath + EP_COOLDOWN_PATH);
         if (config.isInt(mapPath + GA_COOLDOWN_PATH)) goldenAppleCooldown = config.getInt(mapPath + GA_COOLDOWN_PATH);
+        if (config.isInt(mapPath + WIND_CHARGE_COOLDOWN_PATH)) windChargeCooldown = Math.clamp(config.getInt(mapPath + WIND_CHARGE_COOLDOWN_PATH), 0, 30);
+        if (config.isBoolean(mapPath + HEALTH_BELOW_NAME_PATH)) healthBelowName = config.getBoolean(mapPath + HEALTH_BELOW_NAME_PATH);
 
         kitData.getData(config, mapPath + KIT_DATA_PATH);
     }
@@ -115,10 +129,12 @@ public class CustomLadder extends Ladder {
         config.set(mapPath + HUNGER_PATH, hunger);
         config.set(mapPath + BUILD_PATH, build);
         config.set(mapPath + ROUNDS_PATH, rounds);
-        config.set(mapPath + HITDELAY_PATH, hitDelay);
+        config.set(mapPath + HITDELAY_PATH, attackCooldownModifier);
         config.set(mapPath + KNOCKBACK_PATH, ladderKnockback.get());
         config.set(mapPath + EP_COOLDOWN_PATH, enderPearlCooldown);
         config.set(mapPath + GA_COOLDOWN_PATH, goldenAppleCooldown);
+        config.set(mapPath + WIND_CHARGE_COOLDOWN_PATH, windChargeCooldown);
+        config.set(mapPath + HEALTH_BELOW_NAME_PATH, healthBelowName);
 
         kitData.saveData(config, mapPath + KIT_DATA_PATH);
     }
@@ -136,6 +152,15 @@ public class CustomLadder extends Ladder {
     @Override
     public boolean isEnabled() {
         return isReadyToEnable();
+    }
+
+    /**
+     * Converts hitdelay ticks to multiplier (old format to new format)
+     * Default 20 ticks = 1.0 multiplier
+     */
+    private static double convertHitDelayToMultiplier(int ticks) {
+        if (ticks <= 0) return 0;
+        return Math.clamp(ticks / 20.0, 0, 3.0);
     }
 
 }

@@ -6,7 +6,7 @@ import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.fight.event.enums.EventStatus;
 import dev.nandi0813.practice.manager.fight.event.events.ffa.interfaces.FFAEvent;
 import dev.nandi0813.practice.manager.server.ServerManager;
-import dev.nandi0813.practice.module.interfaces.KitData;
+import dev.nandi0813.practice.util.KitData;
 import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -72,6 +72,10 @@ public class Juggernaut extends FFAEvent {
 
     @Override
     public void endEvent() {
+        if (this.status.equals(EventStatus.END)) {
+            return;
+        }
+
         EventEndEvent event = new EventEndEvent(this);
         Bukkit.getPluginManager().callEvent(event);
 

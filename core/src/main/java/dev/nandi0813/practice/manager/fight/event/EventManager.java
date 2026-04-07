@@ -28,12 +28,17 @@ import dev.nandi0813.practice.manager.fight.event.events.onevsall.tnttag.TNTTagL
 import dev.nandi0813.practice.manager.fight.event.interfaces.Event;
 import dev.nandi0813.practice.manager.fight.event.interfaces.EventData;
 import dev.nandi0813.practice.manager.fight.event.interfaces.EventListenerInterface;
+import dev.nandi0813.practice.manager.fight.match.util.TitleUtil;
 import dev.nandi0813.practice.manager.gui.GUIManager;
 import dev.nandi0813.practice.manager.gui.guis.EventHostGui;
 import dev.nandi0813.practice.manager.gui.setup.event.EventSetupManager;
+import dev.nandi0813.practice.manager.profile.Profile;
+import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.StartUpCallback;
+import dev.nandi0813.practice.util.StringUtil;
 import lombok.Getter;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -45,6 +50,10 @@ import java.util.Map;
 
 @Getter
 public class EventManager {
+
+    private static final long TITLE_FADE_IN_MS = 200;
+    private static final long TITLE_STAY_MS = 1500;
+    private static final long TITLE_FADE_OUT_MS = 300;
 
     private static EventManager instance;
 
@@ -59,6 +68,9 @@ public class EventManager {
     private final Map<EventType, EventListenerInterface> eventListeners;
 
     private final EventListener listener;
+
+    @Getter
+    private AutoEventScheduler autoEventScheduler;
 
     public static final ItemStack PLAYER_TRACKER = ConfigManager.getGuiItem("EVENT.PLAYER-TRACKER").get();
 
@@ -99,7 +111,11 @@ public class EventManager {
                 data.getData();
             }
 
-            Bukkit.getScheduler().runTask(ZonePractice.getInstance(), startUpCallback::onLoadingDone);
+            Bukkit.getScheduler().runTask(ZonePractice.getInstance(), () -> {
+                autoEventScheduler = new AutoEventScheduler();
+                autoEventScheduler.start();
+                startUpCallback.onLoadingDone();
+            });
         });
     }
 
@@ -112,7 +128,10 @@ public class EventManager {
     }
 
     public void endEvents() {
-        for (Event event : events) {
+        if (autoEventScheduler != null) {
+            autoEventScheduler.cancel();
+        }
+        for (Event event : new java.util.ArrayList<>(events)) {
             event.forceEnd(null);
         }
     }
@@ -124,6 +143,45 @@ public class EventManager {
     }
 
     public void startEvent(Player starter, EventType eventType) {
+        if (eventType == null) {
+            return;
+        }
+
+        if (!getEventData().get(eventType).isEnabled()) {
+            ZonePractice.getInstance().getLogger().warning("Event " + eventType.getName() + " is not enabled.");
+            return;
+        }
+
+        if (starter != null) {
+            if (!starter.hasPermission("zpp.event.host") ||
+                    (!starter.hasPermission("zpp.event.host." + eventType.name().toLowerCase()) && !starter.hasPermission("zpp.event.host.all"))) {
+                Common.sendMMMessage(starter, LanguageManager.getString("EVENT.CANT-HOST-EVENT").replace("%event%", eventType.getName()));
+                return;
+            }
+
+            Profile starterProfile = ProfileManager.getInstance().getProfile(starter);
+            if (starterProfile == null || starterProfile.getEventStartLeft() <= 0) {
+                Common.sendMMMessage(starter, LanguageManager.getString("EVENT.CANT-HOST-EVENT-TODAY"));
+                return;
+            }
+        }
+
+        if (!this.events.isEmpty() && ConfigManager.getBoolean("EVENT.MULTIPLE")) {
+            for (Event liveEvent : this.events) {
+                if (liveEvent.getStatus().equals(dev.nandi0813.practice.manager.fight.event.enums.EventStatus.COLLECTING)) {
+                    if (starter != null) {
+                        Common.sendMMMessage(starter, LanguageManager.getString("COMMAND.EVENT.ARGUMENTS.HOST.CANT-HOST-NOW"));
+                    }
+                    return;
+                }
+            }
+        } else if (!this.events.isEmpty() && !ConfigManager.getBoolean("EVENT.MULTIPLE")) {
+            if (starter != null) {
+                Common.sendMMMessage(starter, LanguageManager.getString("EVENT.ONLY-ONE-EVENT"));
+            }
+            return;
+        }
+
         if (this.isEventLive(eventType)) {
             if (starter != null)
                 Common.sendMMMessage(starter, LanguageManager.getString("EVENT.CANT-START-EVENT").replace("%event%", eventType.getName()));
@@ -144,7 +202,18 @@ public class EventManager {
         };
 
         events.add(event);
-        event.startQueue();
+        if (!event.startQueue()) {
+            events.remove(event);
+            return;
+        }
+
+        if (starter != null) {
+            Profile starterProfile = ProfileManager.getInstance().getProfile(starter);
+            if (starterProfile != null) {
+                starterProfile.setEventStartLeft(Math.max(0, starterProfile.getEventStartLeft() - 1));
+            }
+        }
+
     }
 
     public boolean isEventLive(EventType eventType) {
@@ -182,6 +251,68 @@ public class EventManager {
             }
         }
         return null;
+    }
+
+    public int getPostKillDelayTicks() {
+        int seconds = ConfigManager.getInt("EVENT.DUEL.POST-KILL-DELAY", 3);
+        return Math.max(0, seconds) * 20;
+    }
+
+    public void sendConfiguredEventTitle(Player player, String titlePath, String subtitlePath, Map<String, String> placeholders) {
+        if (player == null) {
+            return;
+        }
+
+        String titleRaw = applyPlaceholders(LanguageManager.getString(titlePath), placeholders);
+        String subtitleRaw = applyPlaceholders(LanguageManager.getString(subtitlePath), placeholders);
+
+        TitleUtil.sendTitle(
+                player,
+                toTitleComponent(titleRaw),
+                toTitleComponent(subtitleRaw),
+                TITLE_FADE_IN_MS,
+                TITLE_STAY_MS,
+                TITLE_FADE_OUT_MS
+        );
+    }
+
+    public void sendRawEventTitle(Player player, String titleRaw, String subtitleRaw) {
+        if (player == null) {
+            return;
+        }
+
+        TitleUtil.sendTitle(
+                player,
+                toTitleComponent(titleRaw),
+                toTitleComponent(subtitleRaw),
+                TITLE_FADE_IN_MS,
+                TITLE_STAY_MS,
+                TITLE_FADE_OUT_MS
+        );
+    }
+
+    private String applyPlaceholders(String raw, Map<String, String> placeholders) {
+        if (raw == null || placeholders == null || placeholders.isEmpty()) {
+            return raw == null ? "" : raw;
+        }
+
+        String parsed = raw;
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            parsed = parsed.replace(entry.getKey(), entry.getValue());
+        }
+        return parsed;
+    }
+
+    private Component toTitleComponent(String line) {
+        if (line == null || line.isEmpty()) {
+            return Component.empty();
+        }
+
+        if (line.contains("&") || line.contains("§")) {
+            line = StringUtil.legacyColorToMiniMessage(line);
+        }
+
+        return Common.deserializeMiniMessage(line);
     }
 
 }

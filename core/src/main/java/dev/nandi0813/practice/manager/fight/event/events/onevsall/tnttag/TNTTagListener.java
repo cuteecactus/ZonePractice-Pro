@@ -5,6 +5,7 @@ import dev.nandi0813.practice.manager.fight.event.enums.EventStatus;
 import dev.nandi0813.practice.manager.fight.event.interfaces.Event;
 import dev.nandi0813.practice.manager.fight.event.interfaces.EventListenerInterface;
 import dev.nandi0813.practice.util.Cuboid;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -42,8 +43,6 @@ public class TNTTagListener extends EventListenerInterface {
                 e.setCancelled(true);
                 return;
             }
-
-            e.setDamage(0);
 
             if (tntTag.getTaggedPlayers().contains(attacker) && !tntTag.getTaggedPlayers().contains(target)) {
                 tntTag.setTag(attacker, target);
@@ -85,9 +84,18 @@ public class TNTTagListener extends EventListenerInterface {
     @Override
     public void onPlayerMove(Event event, PlayerMoveEvent e) {
         if (event instanceof TNTTag tntTag) {
+            // Only enforce boundary for active players during LIVE/START phase.
+            // Spectators are free to move and the event may still fire during END.
+            if (!event.getStatus().equals(EventStatus.LIVE) && !event.getStatus().equals(EventStatus.START)) {
+                return;
+            }
+            Player player = e.getPlayer();
+            if (!tntTag.getPlayers().contains(player)) {
+                return;
+            }
             Cuboid cuboid = event.getEventData().getCuboid();
-            if (!cuboid.contains(e.getTo())) {
-                tntTag.teleportPlayer(e.getPlayer());
+            if (cuboid != null && !cuboid.contains(e.getTo())) {
+                tntTag.teleportPlayer(player);
             }
         }
     }
@@ -116,5 +124,4 @@ public class TNTTagListener extends EventListenerInterface {
             e.setCancelled(true);
         }
     }
-
 }

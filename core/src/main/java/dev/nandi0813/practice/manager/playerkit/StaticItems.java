@@ -1,8 +1,8 @@
 package dev.nandi0813.practice.manager.playerkit;
 
 import dev.nandi0813.practice.manager.gui.GUIItem;
+import dev.nandi0813.practice.manager.ladder.util.LadderUtil;
 import dev.nandi0813.practice.manager.playerkit.items.EditorIcon;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.Pair;
 import org.bukkit.enchantments.Enchantment;
@@ -45,6 +45,7 @@ public enum StaticItems {
     public static final EditorIcon CATEGORY_GUI_POTIONS_ICON = PlayerKitManager.getInstance().getEditorItem("GUI.ITEMS.CATEGORY-GUI.ICONS.POTIONS");
     public static final EditorIcon CATEGORY_GUI_FOOD_ICON = PlayerKitManager.getInstance().getEditorItem("GUI.ITEMS.CATEGORY-GUI.ICONS.FOOD");
     public static final EditorIcon CATEGORY_GUI_BLOCKS_ICON = PlayerKitManager.getInstance().getEditorItem("GUI.ITEMS.CATEGORY-GUI.ICONS.BLOCKS");
+    public static final EditorIcon CATEGORY_GUI_SHULKER_ICON = PlayerKitManager.getInstance().getEditorItem("GUI.ITEMS.CATEGORY-GUI.ICONS.SHULKER-BOXES");
 
     // Categories with page
     public static final EditorIcon CATEGORY_GUI_PAGE_BACK_ICON = PlayerKitManager.getInstance().getEditorItem("GUI.ITEMS.ITEMS-GUI.OFFICIAL-ICONS.BACK-TO");
@@ -62,6 +63,7 @@ public enum StaticItems {
     public static final List<String> CATEGORY_FOOD_ITEMS = PlayerKitManager.getInstance().getList("GUI.ITEMS.ITEMS-GUI.CATEGORIES.FOOD.ITEMS");
     public static final String CATEGORY_BLOCKS_TITLE = PlayerKitManager.getInstance().getString("GUI.ITEMS.ITEMS-GUI.CATEGORIES.BLOCKS.TITLE");
     public static final List<String> CATEGORY_BLOCKS_ITEMS = PlayerKitManager.getInstance().getList("GUI.ITEMS.ITEMS-GUI.CATEGORIES.BLOCKS.ITEMS");
+    public static final String CATEGORY_SHULKER_TITLE = PlayerKitManager.getInstance().getString("GUI.ITEMS.ITEMS-GUI.CATEGORIES.SHULKER-BOXES.TITLE");
 
     // Potions GUI
     public static final String POTIONS_GUI_TITLE = PlayerKitManager.getInstance().getString("GUI.ITEMS.ITEMS-GUI.CATEGORIES.POTION.TITLE");
@@ -73,14 +75,14 @@ public enum StaticItems {
 
     static {
         for (String string : PlayerKitManager.getInstance().getList("GUI.ITEMS.ITEMS-GUI.CATEGORIES.POTION.SPLASH-POTIONS.ITEMS")) {
-            ItemStack itemStack = ClassImport.getClasses().getLadderUtil().getPotionItem(string);
+            ItemStack itemStack = LadderUtil.getPotionItem(string);
             if (itemStack != null) {
                 POTIONS_GUI_SPLASH_POTIONS.add(itemStack);
             }
         }
 
         for (String string : PlayerKitManager.getInstance().getList("GUI.ITEMS.ITEMS-GUI.CATEGORIES.POTION.DRINKABLE-POTIONS.ITEMS")) {
-            ItemStack itemStack = ClassImport.getClasses().getLadderUtil().getPotionItem(string);
+            ItemStack itemStack = LadderUtil.getPotionItem(string);
             if (itemStack != null) {
                 POTIONS_GUI_DRINKABLE_POTIONS.add(itemStack);
             }
@@ -140,7 +142,10 @@ public enum StaticItems {
             List<Enchantment> enchantments = new ArrayList<>();
             for (String enchantment : PlayerKitManager.getInstance().getList("DISABLED-ENCHANTS." + path)) {
                 try {
-                    enchantments.add(Enchantment.getByName(enchantment));
+                    Enchantment parsed = Common.resolveEnchantment(enchantment);
+                    if (parsed != null) {
+                        enchantments.add(parsed);
+                    }
                 } catch (Exception e) {
                     Common.sendConsoleMMMessage("<red>Invalid enchantment name: " + enchantment);
                 }
@@ -161,5 +166,7 @@ public enum StaticItems {
     public static final GUIItem HITDELAY_ITEM = PlayerKitManager.getInstance().getGuiItem("GUI.CUSTOM-SETTINGS.ICONS.NORMAL-SETTINGS.HITDELAY");
     public static final GUIItem ENDERPEARL_ITEM = PlayerKitManager.getInstance().getGuiItem("GUI.CUSTOM-SETTINGS.ICONS.NORMAL-SETTINGS.ENDERPEARL-COOLDOWN");
     public static final GUIItem GAPPLE_ITEM = PlayerKitManager.getInstance().getGuiItem("GUI.CUSTOM-SETTINGS.ICONS.NORMAL-SETTINGS.GOLDENAPPLE-COOLDOWN");
+    public static final GUIItem WIND_CHARGE_ITEM = PlayerKitManager.getInstance().getGuiItem("GUI.CUSTOM-SETTINGS.ICONS.NORMAL-SETTINGS.WIND-CHARGE-COOLDOWN");
+    public static final Pair<ItemStack, ItemStack> HEALTH_BELOW_NAME_ITEM = new Pair<>(PlayerKitManager.getInstance().getGuiItem("GUI.CUSTOM-SETTINGS.ICONS.NORMAL-SETTINGS.HEALTH-BELOW-NAME.ENABLED").get(), PlayerKitManager.getInstance().getGuiItem("GUI.CUSTOM-SETTINGS.ICONS.NORMAL-SETTINGS.HEALTH-BELOW-NAME.DISABLED").get());
 
 }

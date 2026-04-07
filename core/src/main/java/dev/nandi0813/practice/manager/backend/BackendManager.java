@@ -16,6 +16,9 @@ import java.util.Set;
 public enum BackendManager {
     ;
 
+    private static final String PRACTICE_STATS_SERVER_HASH_PATH = "TELEMETRY.PRACTICE_STATS.SERVER_HASH";
+    private static final String PRACTICE_STATS_SERVER_HASH_PREFIX = "ZPPV1_";
+
     private static File file;
     @Getter
     private static YamlConfiguration config;
@@ -43,7 +46,12 @@ public enum BackendManager {
         try {
             config.save(file);
         } catch (IOException e) {
-            Common.sendConsoleMMMessage("<red>Error: " + e.getMessage());
+            Common.sendConsoleMMMessage("<red>Error saving backend.yml: " + e.getMessage());
+        } catch (Exception e) {
+            // Catches NullPointerException thrown by SnakeYAML when a ConfigurationSerializable
+            // (e.g. Location with a null world WeakReference) produces a null entry in its
+            // serialize() map. Log clearly instead of letting the async task swallow the trace.
+            Common.sendConsoleMMMessage("<red>Error serializing backend.yml (possible null world in lobby location): " + e.getMessage());
         }
     }
 
@@ -77,6 +85,61 @@ public enum BackendManager {
 
     public static List<String> getList(String loc) {
         return getConfig().getStringList(loc);
+    }
+
+    public static String getPracticeStatsServerHash() {
+        if (config == null) {
+            return null;
+        }
+
+        String configuredHash = config.getString(PRACTICE_STATS_SERVER_HASH_PATH);
+        if (configuredHash == null) {
+            return null;
+        }
+
+        String normalized = normalizePracticeStatsServerHash(configuredHash);
+        if (normalized == null) {
+            return null;
+        }
+
+        // Migrate legacy values so next restart keeps the same prefixed format.
+        if (!normalized.equals(configuredHash)) {
+            config.set(PRACTICE_STATS_SERVER_HASH_PATH, normalized);
+            save();
+        }
+
+        return normalized;
+    }
+
+    public static String getOrCreatePracticeStatsServerHash(String generatedHash) {
+        String existing = getPracticeStatsServerHash();
+        if (existing != null) {
+            return existing;
+        }
+
+        String normalizedGenerated = normalizePracticeStatsServerHash(generatedHash);
+        if (normalizedGenerated == null) {
+            return null;
+        }
+
+        config.set(PRACTICE_STATS_SERVER_HASH_PATH, normalizedGenerated);
+        save();
+        return normalizedGenerated;
+    }
+
+    private static String normalizePracticeStatsServerHash(String hash) {
+        if (hash == null) {
+            return null;
+        }
+
+        String trimmed = hash.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+
+        return trimmed.startsWith(PRACTICE_STATS_SERVER_HASH_PREFIX)
+                ? trimmed
+                : PRACTICE_STATS_SERVER_HASH_PREFIX + trimmed;
     }
 
 }

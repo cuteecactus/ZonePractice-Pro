@@ -1,18 +1,23 @@
 package dev.nandi0813.practice.manager.profile;
 
+import dev.nandi0813.practice.event.ProfileStatusChangeEvent;
+import dev.nandi0813.practice.manager.fight.match.MatchManager;
 import dev.nandi0813.practice.manager.fight.match.util.CustomKit;
 import dev.nandi0813.practice.manager.gui.guis.customladder.PlayerCustomKitSelector;
 import dev.nandi0813.practice.manager.gui.guis.profile.ProfileSettingsGui;
 import dev.nandi0813.practice.manager.ladder.abstraction.normal.NormalLadder;
 import dev.nandi0813.practice.manager.ladder.abstraction.playercustom.CustomLadder;
+import dev.nandi0813.practice.manager.party.Party;
+import dev.nandi0813.practice.manager.party.PartyManager;
+import dev.nandi0813.practice.manager.profile.cosmetics.CosmeticsData;
+import dev.nandi0813.practice.manager.profile.enums.ProfilePrefixVisibility;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
 import dev.nandi0813.practice.manager.profile.enums.ProfileWorldTime;
 import dev.nandi0813.practice.manager.profile.group.Group;
 import dev.nandi0813.practice.manager.profile.group.GroupManager;
 import dev.nandi0813.practice.manager.profile.statistics.ProfileStat;
-import dev.nandi0813.practice.module.interfaces.actionbar.ActionBar;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.Common;
+import dev.nandi0813.practice.util.actionbar.ActionBar;
 import lombok.Getter;
 import lombok.Setter;
 import net.kyori.adventure.text.Component;
@@ -34,6 +39,7 @@ public class Profile {
     private Group group;
 
     private Component prefix;
+    private String nameTemplate;
     private NamedTextColor nameColor;
     private Component suffix;
 
@@ -58,6 +64,7 @@ public class Profile {
     private boolean privateMessages;
     private ProfileWorldTime worldTime;
     private boolean flying;
+    private ProfilePrefixVisibility prefixVisibility = ProfilePrefixVisibility.PREFIX_AND_SUFFIX;
 
     private int allowedCustomKits;
     private final Map<NormalLadder, Map<Integer, CustomKit>> unrankedCustomKits = new HashMap<>();
@@ -68,10 +75,14 @@ public class Profile {
     private int unrankedLeft = 0;
     private int rankedLeft = 0;
     private int eventStartLeft = 0;
+    private int partyBroadcastLeft = 0;
 
     private RankedBan rankedBan = new RankedBan();
     private ProfileSettingsGui settingsGui;
-    private ActionBar actionBar = ClassImport.createActionBarClass(this);
+    private ActionBar actionBar = new ActionBar(this);
+
+    // Cosmetics data for armor trims
+    private CosmeticsData cosmeticsData = new CosmeticsData();
 
     // Custom ladder
     private PlayerCustomKitSelector playerCustomKitSelector;
@@ -80,7 +91,10 @@ public class Profile {
 
     public Profile(UUID uuid, OfflinePlayer player) {
         this.uuid = uuid;
-        this.player = player;
+        // Never pin a live Player instance here; always resolve online player from UUID.
+        this.player = (player instanceof Player)
+                ? Bukkit.getOfflinePlayer(uuid)
+                : Objects.requireNonNullElseGet(player, () -> Bukkit.getOfflinePlayer(uuid));
         this.status = ProfileStatus.OFFLINE;
         this.file = new ProfileFile(this);
         this.stats = new ProfileStat(this);
@@ -92,6 +106,14 @@ public class Profile {
         this.status = ProfileStatus.OFFLINE;
         this.file = new ProfileFile(this);
         this.stats = new ProfileStat(this);
+    }
+
+    /**
+     * Resolves the currently connected player for this profile by UUID.
+     * Returns null when the player is offline.
+     */
+    public Player getOnlinePlayer() {
+        return Bukkit.getPlayer(uuid);
     }
 
     public void saveData() {
@@ -116,7 +138,7 @@ public class Profile {
 
         if (this.file.getConfig().isConfigurationSection("player-custom-kit")) {
             this.customLadders.clear();
-            for (String ladder : this.file.getConfig().getConfigurationSection("player-custom-kit").getKeys(false)) {
+            for (String ladder : Objects.requireNonNull(this.file.getConfig().getConfigurationSection("player-custom-kit")).getKeys(false)) {
                 try {
                     int i = Integer.parseInt(ladder);
                     if (i < 0 || i > 5) {
@@ -148,7 +170,7 @@ public class Profile {
     }
 
     public void checkGroup() {
-        Player online = Bukkit.getPlayer(uuid);
+        Player online = getOnlinePlayer();
         if (online == null || !online.isOnline()) return;
 
         Group newGroup = GroupManager.getInstance().getGroup(online);
@@ -170,7 +192,7 @@ public class Profile {
     }
 
     public int getCustomKitPerm() {
-        Player onlinePlayer = player.getPlayer();
+        Player onlinePlayer = getOnlinePlayer();
 
         if (onlinePlayer == null) {
             return 0;
@@ -192,16 +214,37 @@ public class Profile {
         this.unrankedLeft = group.getUnrankedLimit();
         this.rankedLeft = group.getRankedLimit();
         this.eventStartLeft = group.getEventStartLimit();
+        this.partyBroadcastLeft = group.getPartyBroadcastLimit();
+
+        Player onlinePlayer = this.getOnlinePlayer();
+        if (onlinePlayer != null) {
+            Party partyObj = PartyManager.getInstance().getParty(onlinePlayer);
+            if (partyObj != null && onlinePlayer.equals(partyObj.getLeader())) {
+                partyObj.refreshMaxPlayerLimitForLeader();
+            }
+        }
 
         while (this.customLadders.size() < this.group.getCustomKitLimit()) {
             this.customLadders.add(new CustomLadder(this, "player-custom-kit." + customLadders.size(), this.customLadders.size() + 1));
         }
 
         while (this.customLadders.size() > this.group.getCustomKitLimit()) {
-            this.customLadders.remove(this.customLadders.size() - 1);
+            this.customLadders.removeLast();
         }
 
-        this.playerCustomKitSelector = new PlayerCustomKitSelector(this);
+        // Invalidate the selector so it gets recreated on next access (lazy-loading)
+        this.playerCustomKitSelector = null;
+    }
+
+    /**
+     * Lazily loads and returns the PlayerCustomKitSelector.
+     * Creates it only when first accessed to save RAM for offline players.
+     */
+    public PlayerCustomKitSelector getPlayerCustomKitSelector() {
+        if (this.playerCustomKitSelector == null) {
+            this.playerCustomKitSelector = new PlayerCustomKitSelector(this);
+        }
+        return this.playerCustomKitSelector;
     }
 
     public void setSelectedCustomLadder(CustomLadder customLadder) {
@@ -214,6 +257,24 @@ public class Profile {
         }
 
         this.selectedCustomLadder = customLadder;
+    }
+
+    public void setStatus(ProfileStatus status) {
+        ProfileStatus previous = this.status;
+        this.status = status;
+
+        Bukkit.getPluginManager().callEvent(new ProfileStatusChangeEvent(this, previous, status));
+
+        // Leaving lobby/spectate for a new activity invalidates pending rematches.
+        if ((previous == ProfileStatus.LOBBY || previous == ProfileStatus.SPECTATE)
+                && status != ProfileStatus.LOBBY
+                && status != ProfileStatus.SPECTATE
+                && status != ProfileStatus.OFFLINE) {
+            Player online = getOnlinePlayer();
+            if (online != null && online.isOnline()) {
+                MatchManager.getInstance().invalidateRematchByPlayer(online);
+            }
+        }
     }
 
 }

@@ -2,7 +2,7 @@ name: ZonePracticePro
 version: '${project.version}'
 main: dev.nandi0813.practice.ZonePractice
 authors: [ Nandi0813 ]
-softdepend: [ PlaceholderAPI, Multiverse-Core, FastAsyncWorldEdit, LiteBans, My_Worlds, TAB, Citizens ]
+softdepend: [ PlaceholderAPI, Multiverse-Core, FastAsyncWorldEdit, My_Worlds, TAB ]
 loadbefore: [ CMI, CMILib ]
 api-version: 1.13
 commands:
@@ -50,8 +50,18 @@ commands:
     description: Copy a custom kit from another player.
   ignorequeue:
     description: Ignore a player in unranked queue.
-  botduel:
-    description: Start a 1-vs-bot duel against the AI. Usage /botduel [ladder]
+  cosmetics:
+    aliases: [cosmetc, csmetic]
+    description: Open the cosmetics GUI for armor trim customization.
+  customqueue:
+    aliases: [cqueue, customkitqueue]
+    description: Queue for custom-kit matchmaking commands.
+  matchhistory:
+    aliases: [mh, matchhist]
+    description: View match history for a player.
+  nick:
+    aliases: [nickname]
+    description: Change your formatted display name.
 
 permissions:
   zpp.admin:
@@ -62,6 +72,7 @@ permissions:
       zpp.event.*: true
       zpp.settings.*: true
       zpp.admin.scoreboard: true
+      zpp.update.notify: true
   zpp.setup:
     description: Setup everything.
     children:
@@ -123,6 +134,28 @@ permissions:
     description: Set player's nametag.
   zpp.practice.nametag.reset:
     description: Reset player's nametag.
+  zpp.practice.nametag.name.others:
+    description: Allow changing other players' name format through /practice nametag name.
+    default: op
+
+  zpp.nick.use:
+    description: Use /nick command.
+    default: true
+  zpp.nick.others:
+    description: Set another player's display name using /nick.
+    default: op
+    children:
+      zpp.nick.use: true
+  zpp.nick.different-name:
+    description: Allow /nick to use a different visible username instead of only styling the real one.
+    default: op
+    children:
+      zpp.nick.use: true
+  zpp.nick.reset.others:
+    description: Reset another player's display name using /nick reset.
+    default: op
+    children:
+      zpp.nick.use: true
 
   zpp.practice.unranked.default:
     description: Reset the player's daily unranked limit to default.
@@ -159,6 +192,7 @@ permissions:
       zpp.settings.playerhide: true
       zpp.settings.allowspectate: true
       zpp.settings.worldtime: true
+      zpp.settings.prefixvisibility: true
   zpp.settings.open:
     description: Open the settings gui.
     default: true
@@ -176,6 +210,8 @@ permissions:
     description: Toggle spectators in their matches.
   zpp.settings.worldtime:
     description: Change world time.
+  zpp.settings.prefixvisibility:
+    description: Change prefix/suffix visibility mode in chat/tab/sidebar/nametag.
   zpp.settings.fly:
     description: Toggle fly in the lobby.
 
@@ -223,6 +259,9 @@ permissions:
     default: true
     description: Ignore a player in unranked queue.
 
+  zpp.queue.multi:
+    description: Allows players to queue for multiple ladders in the same queue type.
+
   zpp.duel:
     description: Use the /duel command.
   zpp.duel.selectarena:
@@ -232,10 +271,6 @@ permissions:
 
   zpp.duel.infiniteinvite:
     description: Player can invite player to duel any number of times.
-
-  zpp.botduel:
-    default: op
-    description: Start a 1-vs-bot duel via /botduel [ladder].
   zpp.party.selectarena:
     description: Choose arena to play in with party.
   zpp.party.selectrounds:
@@ -293,6 +328,8 @@ permissions:
     description: Bypass unranked limit per day.
   zpp.bypass.ranked.limit:
     description: Bypass ranked limit per day.
+  zpp.bypass.party.broadcast.limit:
+    description: Bypass the daily party broadcast limit.
   zpp.bypass.elo.change:
     description: Players elo cannot be changed with commands.
   zpp.bypass.forceend:
@@ -322,3 +359,62 @@ permissions:
     description: Share custom kit with others.
   zpp.playerkit.copy:
     description: Copy custom kit from others.
+  zpp.playerkit.queue.host:
+    description: Host a custom kit queue.
+  zpp.playerkit.queue.use:
+    description: Use custom kit queue commands.
+    default: true
+
+  # Cosmetics
+  zpp.cosmetics.main:
+    description: Open the cosmetics GUI.
+  zpp.cosmetics.armortrim.base.*:
+    description: Allow access to all armor base tiers.
+    children:
+      zpp.cosmetics.armortrim.base.leather: true
+      zpp.cosmetics.armortrim.base.gold: true
+      zpp.cosmetics.armortrim.base.iron: true
+      zpp.cosmetics.armortrim.base.diamond: true
+      zpp.cosmetics.armortrim.base.netherite: true
+  zpp.cosmetics.armortrim.base.leather:
+    description: Allow access to Leather armor tier.
+  zpp.cosmetics.armortrim.base.gold:
+    description: Allow access to Gold armor tier.
+  zpp.cosmetics.armortrim.base.iron:
+    description: Allow access to Iron armor tier.
+  zpp.cosmetics.armortrim.base.diamond:
+    description: Allow access to Diamond armor tier.
+  zpp.cosmetics.armortrim.base.netherite:
+    description: Allow access to Netherite armor tier.
+  zpp.cosmetics.armortrim.apply-global:
+    description: Copy armor trim setting to all armor types.
+  zpp.cosmetics.lobby.*:
+    description: Access all lobby movement cosmetics.
+    children:
+      zpp.cosmetics.lobby.none: true
+      zpp.cosmetics.lobby.wind_charge: true
+      zpp.cosmetics.lobby.trident: true
+      zpp.cosmetics.lobby.spear: true
+  zpp.cosmetics.lobby.none:
+    description: Select no lobby movement cosmetic.
+  zpp.cosmetics.lobby.wind_charge:
+    description: Select the lobby wind charge cosmetic.
+  zpp.cosmetics.lobby.trident:
+    description: Select the lobby trident cosmetic.
+  zpp.cosmetics.lobby.spear:
+    description: Select the lobby spear cosmetic.
+
+  # Note: zpp.cosmetics.pattern.* and zpp.cosmetics.material.* permissions are
+  # dynamically registered at runtime by ArmorTrimPermissionManager based on
+  # available trim patterns and materials in the server's Minecraft version.
+  # They do NOT need to be declared here.
+
+  # Update notifier
+  zpp.update.notify:
+    description: Receive in-game notifications when a new ZonePractice Pro version is released.
+    default: op
+
+  # Match History
+  zpp.matchhistory:
+    description: Access /matchhistory command.
+    default: op

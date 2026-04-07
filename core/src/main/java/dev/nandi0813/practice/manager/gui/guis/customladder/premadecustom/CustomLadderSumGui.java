@@ -3,6 +3,7 @@ package dev.nandi0813.practice.manager.gui.guis.customladder.premadecustom;
 import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.backend.GUIFile;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
+import dev.nandi0813.practice.manager.fight.util.PlayerUtil;
 import dev.nandi0813.practice.manager.gui.GUI;
 import dev.nandi0813.practice.manager.gui.GUIItem;
 import dev.nandi0813.practice.manager.gui.GUIManager;
@@ -12,7 +13,6 @@ import dev.nandi0813.practice.manager.ladder.abstraction.normal.NormalLadder;
 import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
-import dev.nandi0813.practice.module.util.ClassImport;
 import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.InventoryUtil;
 import org.bukkit.Bukkit;
@@ -48,41 +48,38 @@ public class CustomLadderSumGui extends GUI {
 
     @Override
     public void update() {
-        Bukkit.getScheduler().runTaskAsynchronously(ZonePractice.getInstance(), () ->
-        {
-            Inventory inventory = gui.get(1);
+        Inventory inventory = gui.get(1);
 
-            // Set kit columns
-            for (int kit = 1; kit <= 4; kit++) {
-                if (profile.getAllowedCustomKits() >= kit) {
-                    GUIItem fillerItem = GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.FILLER-ITEM-2");
+        // Set kit columns
+        for (int kit = 1; kit <= 4; kit++) {
+            if (profile.getAllowedCustomKits() >= kit) {
+                GUIItem fillerItem = GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.FILLER-ITEM-2");
 
-                    if (profile.getUnrankedCustomKits().get(ladder) != null && profile.getUnrankedCustomKits().get(ladder).get(kit) != null) {
-                        inventory.setItem((kit - 1) * 2 + 1, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.EXISTING-KIT").replace("%kit%", String.valueOf(kit)).get());
-                        inventory.setItem((kit - 1) * 2 + 1 + 9 * 2, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.EDIT-KIT").get());
-                        inventory.setItem((kit - 1) * 2 + 1 + 9 * 3, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.DELETE-KIT").get());
+                if (profile.getUnrankedCustomKits().get(ladder) != null && profile.getUnrankedCustomKits().get(ladder).get(kit) != null) {
+                    inventory.setItem((kit - 1) * 2 + 1, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.EXISTING-KIT").replace("%kit%", String.valueOf(kit)).get());
+                    inventory.setItem((kit - 1) * 2 + 1 + 9 * 2, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.EDIT-KIT").get());
+                    inventory.setItem((kit - 1) * 2 + 1 + 9 * 3, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.DELETE-KIT").get());
 
-                        inventory.setItem((kit - 1) * 2 + 1 + 9, fillerItem.get());
-                    } else {
-                        inventory.setItem((kit - 1) * 2 + 1, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.CREATE-KIT").get());
-                        for (int i = 1; i <= 3; i++)
-                            inventory.setItem((kit - 1) * 2 + 1 + 9 * i, fillerItem.get());
-                    }
+                    inventory.setItem((kit - 1) * 2 + 1 + 9, fillerItem.get());
                 } else {
-                    inventory.setItem((kit - 1) * 2 + 1, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.NO-PERMISSION").get());
+                    inventory.setItem((kit - 1) * 2 + 1, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.CREATE-KIT").get());
                     for (int i = 1; i <= 3; i++)
-                        inventory.setItem((kit - 1) * 2 + 1 + 9 * i, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.FILLER-ITEM-1").get());
+                        inventory.setItem((kit - 1) * 2 + 1 + 9 * i, fillerItem.get());
                 }
+            } else {
+                inventory.setItem((kit - 1) * 2 + 1, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.NO-PERMISSION").get());
+                for (int i = 1; i <= 3; i++)
+                    inventory.setItem((kit - 1) * 2 + 1 + 9 * i, GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.FILLER-ITEM-1").get());
             }
+        }
 
-            // Set filler items between kits
-            for (int i = 0; i < inventory.getSize(); i++) {
-                if (inventory.getItem(i) == null)
-                    inventory.setItem(i, GUIManager.getFILLER_ITEM());
-            }
+        // Set filler items between kits
+        for (int i = 0; i < inventory.getSize(); i++) {
+            if (inventory.getItem(i) == null)
+                inventory.setItem(i, GUIManager.getFILLER_ITEM());
+        }
 
-            updatePlayers();
-        });
+        updatePlayers();
     }
 
     @Override
@@ -143,7 +140,7 @@ public class CustomLadderSumGui extends GUI {
         Player player = (Player) e.getPlayer();
         Profile profile = ProfileManager.getInstance().getProfile(player);
 
-        ClassImport.getClasses().getPlayerUtil().clearInventory(player);
+        PlayerUtil.clearInventory(player);
 
         Bukkit.getScheduler().runTaskLater(ZonePractice.getInstance(), () ->
         {
@@ -164,7 +161,7 @@ public class CustomLadderSumGui extends GUI {
 
         ItemStack backToItem = GUIFile.getGuiItem("GUIS.KIT-EDITOR.KIT-SELECTOR.ICONS.BACK-TO-KIT-SELECTOR").get();
 
-        ClassImport.getClasses().getPlayerUtil().clearInventory(player);
+        PlayerUtil.clearInventory(player);
         for (int i = 0; i < 9; i++)
             player.getInventory().setItem(i, backToItem);
     }

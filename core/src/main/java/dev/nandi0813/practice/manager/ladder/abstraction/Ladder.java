@@ -5,8 +5,8 @@ import dev.nandi0813.practice.manager.backend.ConfigManager;
 import dev.nandi0813.practice.manager.fight.match.enums.MatchType;
 import dev.nandi0813.practice.manager.ladder.enums.LadderType;
 import dev.nandi0813.practice.manager.ladder.util.LadderKnockback;
-import dev.nandi0813.practice.module.interfaces.KitData;
-import dev.nandi0813.practice.module.util.ClassImport;
+import dev.nandi0813.practice.util.Common;
+import dev.nandi0813.practice.util.KitData;
 import dev.nandi0813.practice.util.StringUtil;
 import lombok.Getter;
 import lombok.Setter;
@@ -39,15 +39,19 @@ public abstract class Ladder {
     @Setter
     protected boolean build;
     @Setter
-    protected int hitDelay = 20;
+    protected double attackCooldownModifier = 1.0;
     @Setter
     protected int rounds = 1;
+
+    // Cooldowns
     @Setter
-    protected int enderPearlCooldown = ConfigManager.getInt("MATCH-SETTINGS.ENDERPEARL.COOLDOWN");
+    protected double enderPearlCooldown = ConfigManager.getDouble("MATCH-SETTINGS.COOLDOWN.ENDER-PEARL.SECONDS");
     @Setter
-    protected int goldenAppleCooldown = 0;
+    protected double goldenAppleCooldown = ConfigManager.getDouble("MATCH-SETTINGS.COOLDOWN.GOLDEN-APPLE.SECONDS");
     @Setter
-    protected int fireworkRocketCooldown = ConfigManager.getInt("MATCH-SETTINGS.FIREWORK-ROCKET.COOLDOWN");
+    protected double fireworkRocketCooldown = ConfigManager.getDouble("MATCH-SETTINGS.COOLDOWN.FIREWORK-ROCKET.SECONDS");
+    @Setter
+    protected double windChargeCooldown = ConfigManager.getDouble("MATCH-SETTINGS.COOLDOWN.WIND-CHARGE.SECONDS");
 
     protected List<MatchType> matchTypes = new ArrayList<>();
 
@@ -68,12 +72,20 @@ public abstract class Ladder {
     protected boolean healthBelowName = false;
     @Setter
     protected boolean resetBuildAfterRound = false;
+    @Setter
+    protected boolean breakAllBlocks = false;
+    @Setter
+    protected int roundEndDelay = 3;
+    @Setter
+    protected boolean roundStatusTitles = true;
+    @Setter
+    protected boolean countdownTitles = true;
 
     protected Ladder(String name, LadderType type) {
         this.name = name;
         this.displayName = name;
         this.type = type;
-        this.kitData = ClassImport.createKitData();
+        this.kitData = new KitData();
         this.ladderKnockback = new LadderKnockback();
     }
 
@@ -83,18 +95,19 @@ public abstract class Ladder {
         if (ladder.getIcon() != null) {
             this.icon = ladder.getIcon().clone();
         }
-        this.kitData = ClassImport.createKitData(ladder.getKitData());
+        this.kitData = new KitData(ladder.getKitData());
         this.type = ladder.getType();
         this.enabled = ladder.isEnabled();
         this.ladderKnockback = new LadderKnockback(ladder.getLadderKnockback());
         this.regen = ladder.isRegen();
         this.hunger = ladder.isHunger();
         this.build = ladder.isBuild();
-        this.hitDelay = ladder.getHitDelay();
+        this.attackCooldownModifier = ladder.getAttackCooldownModifier();
         this.rounds = ladder.getRounds();
         this.enderPearlCooldown = ladder.getEnderPearlCooldown();
         this.goldenAppleCooldown = ladder.getGoldenAppleCooldown();
         this.fireworkRocketCooldown = ladder.getFireworkRocketCooldown();
+        this.windChargeCooldown = ladder.getWindChargeCooldown();
         this.matchTypes = new ArrayList<>(ladder.getMatchTypes());
         this.startCountdown = ladder.getStartCountdown();
         this.tntFuseTime = ladder.getTntFuseTime();
@@ -104,6 +117,10 @@ public abstract class Ladder {
         this.startMove = ladder.isStartMove();
         this.healthBelowName = ladder.isHealthBelowName();
         this.resetBuildAfterRound = ladder.isResetBuildAfterRound();
+        this.breakAllBlocks = ladder.isBreakAllBlocks();
+        this.roundEndDelay = ladder.getRoundEndDelay();
+        this.roundStatusTitles = ladder.isRoundStatusTitles();
+        this.countdownTitles = ladder.isCountdownTitles();
     }
 
     public abstract List<Arena> getArenas();
@@ -123,8 +140,9 @@ public abstract class Ladder {
 
         this.icon = icon.clone();
 
-        if (icon.hasItemMeta() && icon.getItemMeta().getDisplayName() != null && !icon.getItemMeta().getDisplayName().equalsIgnoreCase(" "))
-            this.displayName = StringUtil.CC(icon.getItemMeta().getDisplayName());
+        String iconDisplayName = Common.getItemDisplayName(icon);
+        if (!iconDisplayName.isBlank())
+            this.displayName = StringUtil.CC(iconDisplayName);
         else
             this.displayName = name;
     }

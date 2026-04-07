@@ -1,13 +1,19 @@
 package dev.nandi0813.practice.manager.nametag;
 
+import dev.nandi0813.practice.manager.fight.util.PlayerUtil;
+import dev.nandi0813.practice.manager.inventory.InventoryUtil;
+import dev.nandi0813.practice.util.PermanentConfig;
 import lombok.Getter;
 import me.neznamy.tab.api.TabAPI;
 import me.neznamy.tab.api.TabPlayer;
+import me.neznamy.tab.api.event.EventBus;
+import me.neznamy.tab.api.event.player.PlayerLoadEvent;
 import me.neznamy.tab.api.nametag.NameTagManager;
 import me.neznamy.tab.api.tablist.TabListFormatManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 /**
@@ -62,6 +68,29 @@ public class TabIntegration {
         this.tabAPI = api;
         this.available = isAvailable;
         this.tablistFormattingEnabled = tablistEnabled;
+
+        if (this.available) {
+            registerVanillaNameHider();
+            hideNametagsForOnlinePlayers();
+        }
+    }
+
+    private void registerVanillaNameHider() {
+        try {
+            EventBus eventBus = tabAPI.getEventBus();
+            if (eventBus == null) {
+                return;
+            }
+
+            eventBus.register(PlayerLoadEvent.class, event -> hideNametag(event.getPlayer()));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void hideNametagsForOnlinePlayers() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            hideNametag(player);
+        }
     }
 
     /**
@@ -119,29 +148,50 @@ public class TabIntegration {
                     prefixStr = prefixStr + colorCode;
                 }
                 nameTagManager.setPrefix(tabPlayer, prefixStr);
-            } else if (colorCode != null) {
+            } else {
                 // No prefix text, but we have a color - set color as prefix
                 nameTagManager.setPrefix(tabPlayer, colorCode);
-            } else {
-                // No prefix and no color
-                nameTagManager.setPrefix(tabPlayer, "");
             }
 
             // Set the suffix
             nameTagManager.setSuffix(tabPlayer, suffixStr);
 
-            // Preserve the lobby tablist name to prevent match nametag colors from affecting it
-            // In Minecraft 1.21+, scoreboard team colors can bleed into the tab list
-            if (tablistFormattingEnabled) {
-                // TAB's tablist formatting is enabled - use TAB's TabListFormatManager
-                setLobbyTabListName(player);
-            } else {
-                // TAB's tablist formatting is disabled - use our internal Bukkit method
-                preserveTabListNameInternal(player);
+            // Preserve the lobby tablist name to prevent match nametag colors from affecting it.
+            // Only do this when our NAMETAG-MANAGEMENT toggle is enabled.
+            if (PermanentConfig.NAMETAG_MANAGEMENT_ENABLED) {
+                if (tablistFormattingEnabled) {
+                    setLobbyTabListName(player);
+                } else {
+                    preserveTabListNameInternal(player);
+                }
             }
 
         } catch (Exception e) {
             // Silently fail - TAB integration is best-effort
+        }
+    }
+
+    public void hideNametag(Player player) {
+        if (!available || player == null) return;
+
+        try {
+            TabPlayer tabPlayer = tabAPI.getPlayer(player.getUniqueId());
+            if (tabPlayer == null) return;
+
+            hideNametag(tabPlayer);
+        } catch (Exception ignored) {
+        }
+    }
+
+    public void hideNametag(TabPlayer tabPlayer) {
+        if (!available || tabPlayer == null) return;
+
+        try {
+            NameTagManager nameTagManager = tabAPI.getNameTagManager();
+            if (nameTagManager == null) return;
+
+            nameTagManager.hideNameTag(tabPlayer);
+        } catch (Exception ignored) {
         }
     }
 
@@ -153,7 +203,7 @@ public class TabIntegration {
      * @param player The player whose tablist name should be set to lobby formatting
      */
     private void setLobbyTabListName(Player player) {
-        if (!available || !tablistFormattingEnabled) return;
+        if (!available || !tablistFormattingEnabled || !PermanentConfig.NAMETAG_MANAGEMENT_ENABLED) return;
 
         try {
             TabPlayer tabPlayer = tabAPI.getPlayer(player.getUniqueId());
@@ -162,40 +212,16 @@ public class TabIntegration {
             TabListFormatManager tabListFormatManager = tabAPI.getTabListFormatManager();
             if (tabListFormatManager == null) return;
 
-            // Get the player's profile to calculate their lobby tab list name
             dev.nandi0813.practice.manager.profile.Profile profile =
-                dev.nandi0813.practice.manager.profile.ProfileManager.getInstance().getProfile(player);
+                    dev.nandi0813.practice.manager.profile.ProfileManager.getInstance().getProfile(player);
             if (profile == null) return;
 
-            // Calculate lobby formatting components
-            Component lobbyPrefix = Component.empty();
-            Component lobbySuffix = Component.empty();
-            NamedTextColor lobbyNameColor = NamedTextColor.GRAY;
-
-            dev.nandi0813.practice.manager.profile.group.Group group = profile.getGroup();
-            if (group != null) {
-                lobbyPrefix = group.getPrefix();
-                lobbySuffix = group.getSuffix();
-                lobbyNameColor = group.getNameColor();
-            }
-
-            // Apply custom prefix/suffix if set
-            if (profile.getPrefix() != null) lobbyPrefix = profile.getPrefix();
-            if (profile.getSuffix() != null) lobbySuffix = profile.getSuffix();
-
-            // Apply division placeholders to prefix and suffix
-            if (profile.getStats().getDivision() != null) {
-                lobbyPrefix = applyDivisionPlaceholder(lobbyPrefix, profile.getStats().getDivision());
-                lobbySuffix = applyDivisionPlaceholder(lobbySuffix, profile.getStats().getDivision());
-            } else {
-                lobbyPrefix = removeDivisionPlaceholder(lobbyPrefix);
-                lobbySuffix = removeDivisionPlaceholder(lobbySuffix);
-            }
+            InventoryUtil.LobbyNametag lobbyNametag = InventoryUtil.getLobbyNametag(profile, player.getName());
 
             // Convert components to legacy strings for TAB API
-            String prefixStr = componentToLegacy(lobbyPrefix);
-            String suffixStr = componentToLegacy(lobbySuffix);
-            String nameStr = getColorCode(lobbyNameColor) + player.getName();
+            String prefixStr = componentToLegacy(lobbyNametag.getPrefix());
+            String suffixStr = componentToLegacy(lobbyNametag.getSuffix());
+            String nameStr = componentToLegacy(lobbyNametag.getName());
 
             // Use TAB's TabListFormatManager to set the tab list formatting
             tabListFormatManager.setPrefix(tabPlayer, prefixStr);
@@ -216,7 +242,7 @@ public class TabIntegration {
      * @param listName The full formatted component to display in tablist (prefix + colored name + suffix)
      */
     public void setTabListName(Player player, Component listName) {
-        if (!available || !tablistFormattingEnabled) return;
+        if (!available || !tablistFormattingEnabled || !PermanentConfig.NAMETAG_MANAGEMENT_ENABLED) return;
 
         try {
             TabPlayer tabPlayer = tabAPI.getPlayer(player.getUniqueId());
@@ -284,14 +310,21 @@ public class TabIntegration {
 
             // Get TAB's NameTagManager to reset nametag values
             NameTagManager nameTagManager = tabAPI.getNameTagManager();
-            if (nameTagManager == null) return;
+            if (nameTagManager != null) {
+                // Reset nametag prefix and suffix to default (null values reset to TAB's config)
+                nameTagManager.setPrefix(tabPlayer, null);
+                nameTagManager.setSuffix(tabPlayer, null);
+            }
 
-            // Reset nametag prefix and suffix to default (null values reset to TAB's config)
-            nameTagManager.setPrefix(tabPlayer, null);
-            nameTagManager.setSuffix(tabPlayer, null);
-
-            // NOTE: We do NOT reset tablist formatting here
-            // Tablist should remain as configured by TAB (group-based formatting from lobby)
+            // Also reset tablist formatting to TAB's defaults so stale values don't persist
+            if (tablistFormattingEnabled) {
+                TabListFormatManager tabListFormatManager = tabAPI.getTabListFormatManager();
+                if (tabListFormatManager != null) {
+                    tabListFormatManager.setPrefix(tabPlayer, null);
+                    tabListFormatManager.setName(tabPlayer, null);
+                    tabListFormatManager.setSuffix(tabPlayer, null);
+                }
+            }
 
         } catch (Exception e) {
             // Silently fail - TAB integration is best-effort
@@ -314,7 +347,7 @@ public class TabIntegration {
      * @return Legacy color code string (e.g., "§a" for green)
      */
     private String getColorCode(NamedTextColor color) {
-        if (color == null) return "§f"; // Default to white
+        if (color == null) return "§7"; // Default to gray
 
         // Map NamedTextColor to legacy color codes
         if (color == NamedTextColor.BLACK) return "§0";
@@ -334,7 +367,7 @@ public class TabIntegration {
         if (color == NamedTextColor.YELLOW) return "§e";
         if (color == NamedTextColor.WHITE) return "§f";
 
-        return "§f"; // Default to white if unknown
+        return "§7"; // Default to gray if unknown
     }
 
     /**
@@ -387,45 +420,17 @@ public class TabIntegration {
      */
     private void preserveTabListNameInternal(Player player) {
         try {
-            // Get the player's profile to calculate their lobby tab list name
             dev.nandi0813.practice.manager.profile.Profile profile =
-                dev.nandi0813.practice.manager.profile.ProfileManager.getInstance().getProfile(player);
+                    dev.nandi0813.practice.manager.profile.ProfileManager.getInstance().getProfile(player);
             if (profile == null) return;
 
-            // Calculate lobby formatting components
-            Component lobbyPrefix = Component.empty();
-            Component lobbySuffix = Component.empty();
-            NamedTextColor lobbyNameColor = NamedTextColor.GRAY;
-
-            dev.nandi0813.practice.manager.profile.group.Group group = profile.getGroup();
-            if (group != null) {
-                lobbyPrefix = group.getPrefix();
-                lobbySuffix = group.getSuffix();
-                lobbyNameColor = group.getNameColor();
-            }
-
-            // Apply custom prefix/suffix if set
-            if (profile.getPrefix() != null) lobbyPrefix = profile.getPrefix();
-            if (profile.getSuffix() != null) lobbySuffix = profile.getSuffix();
-
-            // Apply division placeholders to prefix and suffix
-            if (profile.getStats().getDivision() != null) {
-                lobbyPrefix = applyDivisionPlaceholder(lobbyPrefix, profile.getStats().getDivision());
-                lobbySuffix = applyDivisionPlaceholder(lobbySuffix, profile.getStats().getDivision());
-            } else {
-                lobbyPrefix = removeDivisionPlaceholder(lobbyPrefix);
-                lobbySuffix = removeDivisionPlaceholder(lobbySuffix);
-            }
-
-            // Build the full tab list name
-            Component tabListName = lobbyPrefix
-                .append(Component.text(player.getName(), lobbyNameColor))
-                .append(lobbySuffix);
+            InventoryUtil.LobbyNametag lobbyNametag = InventoryUtil.getLobbyNametag(profile, player.getName());
+            Component tabListName = lobbyNametag.getPrefix()
+                    .append(lobbyNametag.getName())
+                    .append(lobbyNametag.getSuffix());
 
             // Use internal Bukkit method to set the tablist name (not TAB API)
-            dev.nandi0813.practice.module.util.ClassImport.getClasses()
-                .getPlayerUtil()
-                .setPlayerListName(player, tabListName);
+            PlayerUtil.setPlayerListName(player, tabListName);
 
         } catch (Exception e) {
             // Silently fail - this is best-effort

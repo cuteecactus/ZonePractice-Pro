@@ -16,14 +16,15 @@ import dev.nandi0813.practice.manager.gui.GUIManager;
 import dev.nandi0813.practice.manager.gui.GUIType;
 import dev.nandi0813.practice.manager.gui.setup.arena.ArenaGUISetupManager;
 import dev.nandi0813.practice.manager.ladder.abstraction.normal.NormalLadder;
+import dev.nandi0813.practice.util.Common;
 import dev.nandi0813.practice.util.StringUtil;
 import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Getter
 public abstract class DisplayArena extends NormalArena {
@@ -41,7 +42,7 @@ public abstract class DisplayArena extends NormalArena {
     @Setter
     protected boolean build;
     @Setter
-    protected List<NormalLadder> assignedLadders = new ArrayList<>();
+    protected Set<NormalLadder> assignedLadders = new HashSet<>();
 
     protected DisplayArena(String name, ArenaType type) {
         super(name);
@@ -60,7 +61,7 @@ public abstract class DisplayArena extends NormalArena {
         this.icon = icon.clone();
 
         if (icon.hasItemMeta())
-            this.displayName = StringUtil.CC(icon.getItemMeta().getDisplayName());
+            this.displayName = StringUtil.CC(Common.getItemDisplayName(icon));
         else
             this.displayName = name;
     }
@@ -122,7 +123,7 @@ public abstract class DisplayArena extends NormalArena {
 
     public abstract boolean isReadyToEnable();
 
-    public abstract List<NormalLadder> getAssignableLadders();
+    public abstract Set<NormalLadder> getAssignableLadders();
 
     public abstract boolean deleteData();
 

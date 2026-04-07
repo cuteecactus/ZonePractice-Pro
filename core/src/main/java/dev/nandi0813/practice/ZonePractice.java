@@ -1,39 +1,34 @@
 package dev.nandi0813.practice;
 
 import com.github.retrooper.packetevents.PacketEvents;
-import dev.nandi0813.practice.command.accept.AcceptCommand;
-import net.citizensnpcs.api.CitizensAPI;
-import net.citizensnpcs.api.trait.TraitInfo;
-import dev.nandi0813.practice.manager.fight.match.bot.NeuralBotTrait;
+import dev.faststats.bukkit.BukkitMetrics;
+import dev.faststats.core.ErrorTracker;
 import dev.nandi0813.practice.command.arena.ArenaCommand;
-import dev.nandi0813.practice.command.division.DivisionsCommand;
-import dev.nandi0813.practice.command.duel.DuelCommand;
 import dev.nandi0813.practice.command.event.EventCommand;
 import dev.nandi0813.practice.command.ffa.FFACommand;
-import dev.nandi0813.practice.command.hologram.HologramCommand;
 import dev.nandi0813.practice.command.ladder.LadderCommand;
-import dev.nandi0813.practice.command.matchstats.MatchStatsCommand;
 import dev.nandi0813.practice.command.party.PartyCommand;
 import dev.nandi0813.practice.command.practice.PracticeCommand;
-import dev.nandi0813.practice.command.preview.PreviewCommand;
 import dev.nandi0813.practice.command.privatemessage.MessageCommand;
 import dev.nandi0813.practice.command.privatemessage.ReplyCommand;
-import dev.nandi0813.practice.command.settings.SettingsCommand;
-import dev.nandi0813.practice.command.setup.SetupCommand;
 import dev.nandi0813.practice.command.singlecommands.*;
-import dev.nandi0813.practice.command.spectate.SpectateCommand;
 import dev.nandi0813.practice.command.staff.StaffCommand;
-import dev.nandi0813.practice.command.statistics.StatisticsCommand;
 import dev.nandi0813.practice.listener.*;
-import dev.nandi0813.practice.manager.arena.ArenaListener;
 import dev.nandi0813.practice.manager.arena.ArenaManager;
+import dev.nandi0813.practice.manager.arena.listener.ArenaCopyUtilListener;
+import dev.nandi0813.practice.manager.arena.listener.ArenaListener;
 import dev.nandi0813.practice.manager.arena.setup.SpawnMarkerManager;
 import dev.nandi0813.practice.manager.arena.util.ArenaWorldUtil;
 import dev.nandi0813.practice.manager.backend.*;
 import dev.nandi0813.practice.manager.division.DivisionManager;
 import dev.nandi0813.practice.manager.fight.event.EventManager;
+import dev.nandi0813.practice.manager.fight.ffa.FFAListener;
 import dev.nandi0813.practice.manager.fight.ffa.FFAManager;
+import dev.nandi0813.practice.manager.fight.listener.BuildListener;
+import dev.nandi0813.practice.manager.fight.listener.EPCountdownListener;
+import dev.nandi0813.practice.manager.fight.listener.FireworkRocketCooldownListener;
 import dev.nandi0813.practice.manager.fight.match.MatchManager;
+import dev.nandi0813.practice.manager.fight.util.EntityHider;
 import dev.nandi0813.practice.manager.fight.util.EntityHiderListener;
 import dev.nandi0813.practice.manager.gui.setup.arena.ArenaGUISetupManager;
 import dev.nandi0813.practice.manager.inventory.InventoryManager;
@@ -41,28 +36,33 @@ import dev.nandi0813.practice.manager.ladder.LadderManager;
 import dev.nandi0813.practice.manager.ladder.abstraction.Ladder;
 import dev.nandi0813.practice.manager.leaderboard.LeaderboardManager;
 import dev.nandi0813.practice.manager.leaderboard.hologram.HologramManager;
+import dev.nandi0813.practice.manager.matchhistory.MatchHistoryManager;
 import dev.nandi0813.practice.manager.nametag.NametagManager;
 import dev.nandi0813.practice.manager.playerkit.PlayerKitManager;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
+import dev.nandi0813.practice.manager.profile.cosmetics.CosmeticsPermissionManager;
 import dev.nandi0813.practice.manager.server.ServerManager;
 import dev.nandi0813.practice.manager.sidebar.SidebarManager;
-import dev.nandi0813.practice.module.util.VersionChecker;
+import dev.nandi0813.practice.telemetry.bootstrap.TelemetryBootstrap;
+import dev.nandi0813.practice.telemetry.collector.TelemetryMatchListener;
+import dev.nandi0813.practice.telemetry.transport.ai.AiTrainingLogger;
+import dev.nandi0813.practice.telemetry.transport.regular.TelemetryLogger;
+import dev.nandi0813.practice.telemetry.transport.stats.PracticeStatsTelemetryLogger;
 import dev.nandi0813.practice.util.*;
 import dev.nandi0813.practice.util.placeholderapi.PlayerExpansion;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import lombok.Getter;
-import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ZonePractice extends JavaPlugin {
 
@@ -72,18 +72,30 @@ public final class ZonePractice extends JavaPlugin {
     @Getter
     private static ZonePractice instance;
     @Getter
-    private static BukkitAudiences adventure;
-    @Getter
     private static MiniMessage miniMessage;
+    @Getter
+    private static EntityHider entityHider;
+    @Getter
+    private static ArenaCopyUtilListener arenaCopyUtilListener;
 
     @Getter
     private static volatile boolean fullyLoaded = false;
 
-
+    // BStats
     private Metrics metrics;
+    private final AtomicBoolean telemetryListenerRegistered = new AtomicBoolean(false);
+
+    public static final ErrorTracker ERROR_TRACKER = ErrorTracker.contextAware();
+    private final BukkitMetrics faststats_metrics = BukkitMetrics.factory()
+        .token("98d57804a89964439b95ebbe50247bd4")
+        .errorTracker(ERROR_TRACKER)
+        .debug(false)
+        .create(this);
 
     @Override
     public void onLoad() {
+        instance = this;
+
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().load();
     }
@@ -91,17 +103,17 @@ public final class ZonePractice extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
-        adventure = BukkitAudiences.create(this);
+
         miniMessage = MiniMessage.miniMessage();
+        entityHider = new EntityHider(this, EntityHider.Policy.BLACKLIST);
+        arenaCopyUtilListener = new ArenaCopyUtilListener();
+
         PacketEvents.getAPI().init();
         metrics = new Metrics(this, 16055);
-
-        // Register the neural-network bot trait so Citizens is aware of it before any NPC spawns
-        CitizensAPI.getTraitFactory().registerTrait(TraitInfo.create(NeuralBotTrait.class).withName("neuralbottrait"));
-
+        faststats_metrics.ready();
 
         if (VersionChecker.getBukkitVersion() == null) {
-            Common.sendConsoleMMMessage("<red>Unsupported server version! Please use 1.8.8 or 1.8.9 or 1.20.6 or 1.21.4");
+            Common.sendConsoleMMMessage("<red>Unsupported server version! Please use 1.20.6 or 1.21.X");
             Bukkit.getPluginManager().disablePlugin(this);
             return;
         }
@@ -109,12 +121,38 @@ public final class ZonePractice extends JavaPlugin {
         new SaveResource().saveResources(this);
 
         ConfigManager.createFile();
+        BackendManager.createFile(this);
+        TelemetryBootstrap.initializeAsync()
+                .thenApply(regularEnabled -> regularEnabled
+                        || TelemetryBootstrap.isAiCollectionActive()
+                        || TelemetryBootstrap.isPracticeStatsActive())
+                .thenAccept(enabled -> {
+                    if (!enabled) {
+                        return;
+                    }
+
+                    Bukkit.getScheduler().runTask(this, () -> {
+                        if (!isEnabled()) {
+                            return;
+                        }
+
+                        if (TelemetryBootstrap.isPracticeStatsActive()) {
+                            PracticeStatsTelemetryLogger.initialize();
+                        }
+
+                        if ((TelemetryBootstrap.isActive() || TelemetryBootstrap.isAiCollectionActive())
+                                && telemetryListenerRegistered.compareAndSet(false, true)) {
+                            Bukkit.getPluginManager().registerEvents(new TelemetryMatchListener(), this);
+                        }
+                    });
+                });
         LanguageManager.createFile(this);
         GUIFile.createFile(this);
         MysqlManager.openConnection();
+        MatchHistoryManager.getInstance(); // eagerly initialise singleton
         DivisionManager.getInstance().getData();
         ArenaWorldUtil.createArenaWorld();
-        BackendManager.createFile(this);
+        CosmeticsPermissionManager.registerAllPermissions();
 
         ZonePracticeApiImpl.setup();
         StartUpUtil.loadStartUpProgressMap();
@@ -149,6 +187,10 @@ public final class ZonePractice extends JavaPlugin {
                 ProfileManager.getInstance().loadAllProfileInformations();
                 startUpProgress.replace(StartUpTypes.PROFILE_LOADING, true);
 
+                if (TelemetryBootstrap.isPracticeStatsActive()) {
+                    PracticeStatsTelemetryLogger.onProfilesLoaded();
+                }
+
                 LeaderboardManager.getInstance().createAllLB(() ->
                 {
                     startUpProgress.replace(StartUpTypes.LEADERBOARD_LOADING, true);
@@ -165,6 +207,9 @@ public final class ZonePractice extends JavaPlugin {
 
                     // Mark plugin as fully loaded
                     fullyLoaded = true;
+
+                    // Check for updates asynchronously and log to console
+                    UpdateChecker.checkAsync(ZonePractice.this);
                 });
             });
         });
@@ -199,13 +244,19 @@ public final class ZonePractice extends JavaPlugin {
         EventManager.getInstance().saveEventData();
         ArenaManager.getInstance().saveArenas();
         ProfileManager.getInstance().saveProfiles();
+        MysqlManager.saveProfilesBlocking(ProfileManager.getInstance().getProfiles().values());
         LadderManager.getInstance().saveLadders();
         SidebarManager.getInstance().close();
         InventoryManager.getInstance().setData();
-        if (adventure != null) adventure.close();
         if (metrics != null) metrics.shutdown();
+        faststats_metrics.shutdown();
         MysqlManager.closeConnection();
         BackendManager.save();
+
+        // Flush async telemetry writes at shutdown so completed matches are persisted.
+        TelemetryLogger.shutdown();
+        AiTrainingLogger.shutdown();
+        PracticeStatsTelemetryLogger.shutdown();
     }
 
     /**
@@ -251,6 +302,12 @@ public final class ZonePractice extends JavaPlugin {
         MatchStatsCommand matchStatsCommand = new MatchStatsCommand();
         if (server.getPluginCommand("matchinv") != null) {
             server.getPluginCommand("matchinv").setExecutor(matchStatsCommand);
+        }
+
+        MatchHistoryCommand matchHistoryCommand = new MatchHistoryCommand();
+        if (server.getPluginCommand("matchhistory") != null) {
+            server.getPluginCommand("matchhistory").setExecutor(matchHistoryCommand);
+            server.getPluginCommand("matchhistory").setTabCompleter(matchHistoryCommand);
         }
 
         PartyCommand partyCommand = new PartyCommand();
@@ -336,11 +393,21 @@ public final class ZonePractice extends JavaPlugin {
             server.getPluginCommand("ignorequeue").setTabCompleter(ignoreQueueCommand);
         }
 
-        dev.nandi0813.practice.command.botduel.BotDuelCommand botDuelCommand =
-                new dev.nandi0813.practice.command.botduel.BotDuelCommand();
-        if (server.getPluginCommand("botduel") != null) {
-            server.getPluginCommand("botduel").setExecutor(botDuelCommand);
-            server.getPluginCommand("botduel").setTabCompleter(botDuelCommand);
+        CosmeticsCommand cosmeticsCommand = new CosmeticsCommand();
+        if (server.getPluginCommand("cosmetics") != null) {
+            server.getPluginCommand("cosmetics").setExecutor(cosmeticsCommand);
+        }
+
+        CustomQueueCommand customQueueCommand = new CustomQueueCommand();
+        if (server.getPluginCommand("customqueue") != null) {
+            server.getPluginCommand("customqueue").setExecutor(customQueueCommand);
+            server.getPluginCommand("customqueue").setTabCompleter(customQueueCommand);
+        }
+
+        NickCommand nickCommand = new NickCommand();
+        if (server.getPluginCommand("nick") != null) {
+            server.getPluginCommand("nick").setExecutor(nickCommand);
+            server.getPluginCommand("nick").setTabCompleter(nickCommand);
         }
 
         if (ConfigManager.getBoolean("CHAT.PRIVATE-CHAT-ENABLED")) {
@@ -364,6 +431,7 @@ public final class ZonePractice extends JavaPlugin {
      * It registers all the events that are used in the plugin
      */
     private void registerListeners(PluginManager pm) {
+
         pm.registerEvents(new PlayerPreLogin(), this);
         pm.registerEvents(new PlayerJoin(), this);
         pm.registerEvents(new PlayerQuit(), this);
@@ -372,10 +440,15 @@ public final class ZonePractice extends JavaPlugin {
         pm.registerEvents(new ItemConsume(), this);
         pm.registerEvents(new ProjectileLaunch(), this);
         pm.registerEvents(new PlayerCommandPreprocess(), this);
-        pm.registerEvents(new PlayerChat(), this);
         pm.registerEvents(new EntityDamage(), this);
-        pm.registerEvents(new dev.nandi0813.practice.manager.fight.match.bot.BotMatchListener(), this);
         pm.registerEvents(new ArenaListener(), this);
+        pm.registerEvents(new StatisticListener(), this);
+        pm.registerEvents(arenaCopyUtilListener, this);
+        pm.registerEvents(new BuildListener(), this);
+        pm.registerEvents(new FFAListener(), this);
+        pm.registerEvents(new EPCountdownListener(), this);
+        pm.registerEvents(new FireworkRocketCooldownListener(), this);
+        pm.registerEvents(new PlayerChatListener(), this);
     }
 
 }

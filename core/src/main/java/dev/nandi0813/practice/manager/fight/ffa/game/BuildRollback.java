@@ -1,5 +1,6 @@
 package dev.nandi0813.practice.manager.fight.ffa.game;
 
+import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.backend.ConfigManager;
 import dev.nandi0813.practice.util.fightmapchange.FightChangeOptimized;
 import dev.nandi0813.practice.util.interfaces.Runnable;
@@ -12,10 +13,12 @@ public class BuildRollback extends Runnable {
     private static final int ROLLBACK_SECONDS = ConfigManager.getInt("FFA.ROLLBACK.SECONDS");
 
     private final FightChangeOptimized fightChange;
+    private final java.lang.Runnable onRollbackComplete;
 
-    public BuildRollback(FightChangeOptimized fightChange) {
+    public BuildRollback(FightChangeOptimized fightChange, java.lang.Runnable onRollbackComplete) {
         super(20L, 20L, false);
         this.fightChange = fightChange;
+        this.onRollbackComplete = onRollbackComplete;
         this.seconds = ROLLBACK_SECONDS;
     }
 
@@ -40,7 +43,15 @@ public class BuildRollback extends Runnable {
 
     public void rollback() {
         this.seconds = ROLLBACK_SECONDS;
-        fightChange.rollback(300, 100);
+
+        if (ZonePractice.getInstance().isEnabled()) {
+            fightChange.rollback(300, 100, onRollbackComplete);
+        } else {
+            fightChange.quickRollback();
+            if (onRollbackComplete != null) {
+                onRollbackComplete.run();
+            }
+        }
     }
 
 }
