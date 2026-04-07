@@ -12,6 +12,7 @@ import dev.nandi0813.practice.manager.profile.cosmetics.armortrim.ArmorSlot;
 import dev.nandi0813.practice.manager.profile.cosmetics.armortrim.ArmorTrimTier;
 import dev.nandi0813.practice.manager.profile.cosmetics.deatheffect.DeathEffect;
 import dev.nandi0813.practice.manager.profile.cosmetics.shield.ShieldLayout;
+import dev.nandi0813.practice.manager.profile.enums.ProfilePrefixVisibility;
 import dev.nandi0813.practice.manager.profile.enums.ProfileWorldTime;
 import dev.nandi0813.practice.manager.profile.group.Group;
 import dev.nandi0813.practice.manager.profile.group.GroupManager;
@@ -75,6 +76,7 @@ public class ProfileFile extends ConfigFile {
         config.set("settings.flying", profile.isFlying());
         config.set("settings.messages", profile.isPrivateMessages());
         config.set("settings.worldtime", profile.getWorldTime().toString());
+        config.set("settings.prefix-visibility", profile.getPrefixVisibility().toString());
 
         // Cosmetics data for armor trims
         if (profile.getCosmeticsData() != null) {
@@ -159,6 +161,13 @@ public class ProfileFile extends ConfigFile {
         config.set("settings.messages", ConfigManager.getBoolean("PLAYER.DEFAULT-SETTINGS.PRIVATEMESSAGE"));
         config.set("settings.worldtime", ProfileWorldTime.valueOf(ConfigManager.getString("PLAYER.DEFAULT-SETTINGS.WORLD-TIME")).toString());
 
+        String defaultPrefixVisibility = ConfigManager.getString("PLAYER.DEFAULT-SETTINGS.PREFIX-VISIBILITY");
+        try {
+            config.set("settings.prefix-visibility", ProfilePrefixVisibility.valueOf(defaultPrefixVisibility.toUpperCase(Locale.ROOT)).toString());
+        } catch (Exception ignored) {
+            config.set("settings.prefix-visibility", ProfilePrefixVisibility.PREFIX_AND_SUFFIX.toString());
+        }
+
         saveFile();
     }
 
@@ -204,6 +213,13 @@ public class ProfileFile extends ConfigFile {
         profile.setFlying(config.getBoolean("settings.flying"));
         profile.setPrivateMessages(config.getBoolean("settings.messages"));
         profile.setWorldTime(ProfileWorldTime.valueOf(config.getString("settings.worldtime")));
+
+        String rawPrefixVisibility = config.getString("settings.prefix-visibility", ProfilePrefixVisibility.PREFIX_AND_SUFFIX.toString());
+        try {
+            profile.setPrefixVisibility(ProfilePrefixVisibility.valueOf(rawPrefixVisibility.toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException ignored) {
+            profile.setPrefixVisibility(ProfilePrefixVisibility.PREFIX_AND_SUFFIX);
+        }
 
         // Load cosmetics data for armor trims
         try {

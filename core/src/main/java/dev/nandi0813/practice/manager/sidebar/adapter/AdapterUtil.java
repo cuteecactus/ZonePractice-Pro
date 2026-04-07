@@ -115,8 +115,8 @@ public enum AdapterUtil {
             return Component.text(player.getName());
         }
 
-        // Sidebar placeholders should render player names only (no external prefix/suffix).
-        return NameFormatUtil.resolveName(profile, player.getName());
+        // Sidebar placeholders follow the player's own prefix/suffix visibility setting.
+        return NameFormatUtil.resolveFullName(profile, player.getName());
     }
 
     // ==================== Public Methods ====================

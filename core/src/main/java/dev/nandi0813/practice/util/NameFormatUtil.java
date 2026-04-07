@@ -2,6 +2,7 @@ package dev.nandi0813.practice.util;
 
 import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.profile.Profile;
+import dev.nandi0813.practice.manager.profile.enums.ProfilePrefixVisibility;
 import dev.nandi0813.practice.manager.profile.group.Group;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
@@ -126,6 +127,11 @@ public enum NameFormatUtil {
     }
 
     public static Component resolvePrefix(Profile profile) {
+        ProfilePrefixVisibility visibility = profile.getPrefixVisibility();
+        if (visibility == null || !visibility.isShowPrefix()) {
+            return Component.empty();
+        }
+
         Group group = profile.getGroup();
         Component prefix = Component.empty();
 
@@ -145,6 +151,11 @@ public enum NameFormatUtil {
     }
 
     public static Component resolveSuffix(Profile profile) {
+        ProfilePrefixVisibility visibility = profile.getPrefixVisibility();
+        if (visibility == null || !visibility.isShowSuffix()) {
+            return Component.empty();
+        }
+
         Group group = profile.getGroup();
         Component suffix = Component.empty();
 
@@ -177,6 +188,12 @@ public enum NameFormatUtil {
             nameComponent = Component.text(playerName == null ? "" : playerName, NamedTextColor.GRAY);
         }
         return nameComponent;
+    }
+
+    public static Component resolveFullName(Profile profile, String playerName) {
+        return resolvePrefix(profile)
+                .append(resolveName(profile, playerName))
+                .append(resolveSuffix(profile));
     }
 
     public static NamedTextColor resolveScoreboardColor(Profile profile, String playerName, NamedTextColor fallback) {

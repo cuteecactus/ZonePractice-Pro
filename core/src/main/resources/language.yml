@@ -1,4 +1,4 @@
-VERSION: 37
+VERSION: 38
 
 CONSOLE-NAME: "<red>Console"
 CANT-USE-CONSOLE: "<red>You can't use this command from the console."
@@ -1348,6 +1348,11 @@ PROFILE:
     DAY: "Day"
     SUNSET: "Sunset"
     NIGHT: "Night"
+  PREFIX-VISIBILITY-NAMES:
+    NONE: "None"
+    PREFIX: "Prefix"
+    SUFFIX: "Suffix"
+    PREFIX-AND-SUFFIX: "Prefix and Suffix"
   GROUP-PERMISSION-NAME: "Permission for the %group% player group."
   INACTIVITY-REMOVED: "<red>%count% <yellow>profile got removed because of inactivity."
   NO-GROUP: "<red>You don't have a group."

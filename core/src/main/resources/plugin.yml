@@ -192,6 +192,7 @@ permissions:
       zpp.settings.playerhide: true
       zpp.settings.allowspectate: true
       zpp.settings.worldtime: true
+      zpp.settings.prefixvisibility: true
   zpp.settings.open:
     description: Open the settings gui.
     default: true
@@ -209,6 +210,8 @@ permissions:
     description: Toggle spectators in their matches.
   zpp.settings.worldtime:
     description: Change world time.
+  zpp.settings.prefixvisibility:
+    description: Change prefix/suffix visibility mode in chat/tab/sidebar/nametag.
   zpp.settings.fly:
     description: Toggle fly in the lobby.
 

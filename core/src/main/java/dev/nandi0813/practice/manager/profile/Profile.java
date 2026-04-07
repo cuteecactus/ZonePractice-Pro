@@ -10,6 +10,7 @@ import dev.nandi0813.practice.manager.ladder.abstraction.playercustom.CustomLadd
 import dev.nandi0813.practice.manager.party.Party;
 import dev.nandi0813.practice.manager.party.PartyManager;
 import dev.nandi0813.practice.manager.profile.cosmetics.CosmeticsData;
+import dev.nandi0813.practice.manager.profile.enums.ProfilePrefixVisibility;
 import dev.nandi0813.practice.manager.profile.enums.ProfileStatus;
 import dev.nandi0813.practice.manager.profile.enums.ProfileWorldTime;
 import dev.nandi0813.practice.manager.profile.group.Group;
@@ -63,6 +64,7 @@ public class Profile {
     private boolean privateMessages;
     private ProfileWorldTime worldTime;
     private boolean flying;
+    private ProfilePrefixVisibility prefixVisibility = ProfilePrefixVisibility.PREFIX_AND_SUFFIX;
 
     private int allowedCustomKits;
     private final Map<NormalLadder, Map<Integer, CustomKit>> unrankedCustomKits = new HashMap<>();

@@ -1,4 +1,4 @@
-VERSION: 33
+VERSION: 34
 
 GENERAL-FILLER-ITEM:
   NAME: " "
@@ -799,6 +799,16 @@ GUIS:
           LORE:
             - "&8&m--------------------------------"
             - "&7Click here to change time."
+            - "&8&m--------------------------------"
+        PREFIX-VISIBILITY:
+          NAME: "&dName Decorations: &f%prefixVisibility%"
+          MATERIAL: NAME_TAG
+          LORE:
+            - "&8&m--------------------------------"
+            - "&7Choose what to show from your"
+            - "&7chat/tab/sidebar/nametag decorations."
+            - ""
+            - "&aModes: NONE, PREFIX, SUFFIX, BOTH"
             - "&8&m--------------------------------"
   PLAYER-INFORMATION: # /prac info <name> command
     MAIN-PAGE:
