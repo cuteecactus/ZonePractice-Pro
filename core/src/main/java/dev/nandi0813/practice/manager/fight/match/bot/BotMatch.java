@@ -29,60 +29,15 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.Collections;
 
-/**
- * A 1-vs-bot duel where one human player fights against a Citizens NPC
- * driven by a neural-network model running on an external Python server.
- *
- * <h3>Architecture</h3>
- * <ul>
- *   <li><b>Physics</b>: the NPC is a real {@code PLAYER} entity with normal
- *       Minecraft gravity, knockback, collision, HP, and death.</li>
- *   <li><b>Input + inference</b>: {@code neural_bot} trait ({@code PvPBotTrait})
- *       runs every tick, pushes raw bot/target/inventory state to the Python
- *       server, and applies returned keyboard/mouse predictions on the main thread.</li>
- *   <li><b>Lifecycle</b>: this class is responsible for spawning/despawning the NPC,
- *       applying ladder loadout, and round/match transitions.</li>
- * </ul>
- *
- * <h3>Kill detection</h3>
- * <ul>
- *   <li><b>Human dies</b>: the standard MatchListener handles HP → death → killPlayer.</li>
- *   <li><b>Bot dies</b>: {@link BotMatchListener} catches the NPC's
- *       {@code PlayerDeathEvent} (or the {@code EntityDamageByEntityEvent} where
- *       final damage ≥ NPC HP) and calls {@link #onBotDied(Player)}.</li>
- *   <li><b>Bot attacks human</b>: {@link NeuralBotTrait} calls
- *       {@code target.damage(amount, npcEntity)}, which fires a normal
- *       {@code EntityDamageByEntityEvent}.  {@link BotMatchListener} intercepts
- *       this to bypass the missing-Profile guard on the NPC entity and then
- *       lets the normal damage + kill pipeline proceed.</li>
- * </ul>
- *
- * <h3>Lifecycle</h3>
- * Round start → {@link #spawnBot} → trait tick loop handles inference/actions
- * → round end → {@link #stopBotLoop} (no-op compatibility hook) → {@link #despawnBot}.
- */
 @Getter
 public class BotMatch extends Match implements Team {
 
-    // -----------------------------------------------------------------------
-    // NPC / trait state
-    // -----------------------------------------------------------------------
+    public static final String BOT_DISPLAY_NAME = "PvP Bot";
 
-    /** The Citizens NPC backing the bot; null until spawned. */
     private NPC botNpc;
 
-    // -----------------------------------------------------------------------
-    // Match player
-    // -----------------------------------------------------------------------
-
     private final Player player;
-
-    /** Who won the whole match; null = bot won (human lost all rounds). */
-    private Player matchWinner;
-
-    // -----------------------------------------------------------------------
-    // Constructor
-    // -----------------------------------------------------------------------
+    private Object matchWinner;
 
     public BotMatch(Ladder ladder, Arena arena, Player player, int winsNeeded) {
         super(ladder, arena, Collections.singletonList(player), winsNeeded);
@@ -96,19 +51,12 @@ public class BotMatch extends Match implements Team {
                 TeamEnum.TEAM1.getNameColor(),
                 TeamEnum.TEAM1.getSuffix(),
                 20);
-
     }
-
-    // -----------------------------------------------------------------------
-    // Match / Round lifecycle
-    // -----------------------------------------------------------------------
 
     @Override
     public void startNextRound() {
         BotMatchRound round = new BotMatchRound(this, this.rounds.size() + 1);
         this.rounds.put(round.getRoundNumber(), round);
-
-        stopBotLoop();
         despawnBot();
 
         for (String line : LanguageManager.getList("MATCH.BOT-DUEL.MATCH-START")) {
@@ -141,10 +89,6 @@ public class BotMatch extends Match implements Team {
     public void teleportPlayer(Player player) {
         player.teleport(arena.getPosition1());
     }
-
-    // -----------------------------------------------------------------------
-    // Kill / remove / end
-    // -----------------------------------------------------------------------
 
     @Override
     protected void killPlayer(Player player, String deathMessage) {
@@ -202,8 +146,6 @@ public class BotMatch extends Match implements Team {
     @Override
     public Object getMatchWinner() { return matchWinner; }
 
-    public Player getMatchWinnerPlayer() { return matchWinner; }
-
     @Override
     public boolean isEndMatch() {
         if (this.status.equals(MatchStatus.END)) return true;
@@ -221,34 +163,13 @@ public class BotMatch extends Match implements Team {
 
     @Override
     public void endMatch() {
-        stopBotLoop();
         despawnBot();
         super.endMatch();
     }
 
-    // -----------------------------------------------------------------------
-    // Team interface
-    // -----------------------------------------------------------------------
-
     @Override
     public TeamEnum getTeam(Player player) { return TeamEnum.TEAM1; }
 
-    // -----------------------------------------------------------------------
-    // NPC – spawn / despawn
-    // -----------------------------------------------------------------------
-
-    /**
-     * Spawns the Citizens NPC at {@code spawnLoc} and attaches all traits.
-     *
-     * <ul>
-     *   <li>NPC is a real {@code PLAYER} entity — not protected, so Minecraft
-     *       physics (gravity, knockback, HP depletion) apply normally.</li>
-     *   <li>The NPC is hidden from all players except the duelling player via
-     *       the plugin EntityHider after spawn.</li>
-     *   <li>The bot receives the ladder kit inventory and armor immediately after spawn.</li>
-     *   <li>{@link NeuralBotTrait} drives per-tick inputs.</li>
-     * </ul>
-     */
     private void spawnBot(Location spawnLoc) {
         NPC npc = BotSpawnerUtil.spawnNeuralBot(ZonePractice.getInstance(), spawnLoc, player);
         this.botNpc = npc;
@@ -272,9 +193,6 @@ public class BotMatch extends Match implements Team {
             }
         }
 
-        // ── Visibility: hide the NPC from everyone except the duelling player ─
-        // PlayerFilter in Citizens 2 is a blocklist — addPlayer() hides FROM that player.
-        // Instead we use the existing EntityHider after spawn so the entity is real.
         if (npc.getEntity() != null) {
             for (org.bukkit.entity.Player online : Bukkit.getOnlinePlayers()) {
                 if (!online.equals(player)) {
@@ -284,7 +202,6 @@ public class BotMatch extends Match implements Team {
         }
     }
 
-    /** Despawns and destroys the Citizens NPC safely (no-op if already null). */
     private void despawnBot() {
         if (botNpc == null) return;
         final NPC npc = botNpc;
@@ -295,30 +212,13 @@ public class BotMatch extends Match implements Team {
         });
     }
 
-    private void stopBotLoop() {
-        // Legacy no-op: inference now runs entirely inside PvPBotTrait.run().
-    }
-
-    // -----------------------------------------------------------------------
-    // Bot death — called from BotMatchListener
-    // -----------------------------------------------------------------------
-
-    /**
-     * Called by {@link BotMatchListener} when the NPC entity dies (HP reaches zero).
-     * Ends the current round with the human player as the winner.
-     *
-     * @param humanWinner the human player who killed the bot
-     */
     public void onBotDied(Player humanWinner) {
-        if (!status.equals(MatchStatus.LIVE)) return;
+        if (!status.equals(MatchStatus.LIVE)) {
+            return;
+        }
         SoundManager.getInstance().getSound(SoundType.MATCH_PLAYER_DEATH).play(this.getPeople());
-        getCurrentRound().setRoundWinner(humanWinner);
+        getCurrentRound().setRoundWinner(humanWinner != null ? humanWinner : player);
         getCurrentRound().endRound();
-    }
-
-    /** Returns the Citizens NPC; used by {@link BotMatchListener} for identity checks. */
-    public NPC getBotNpc() {
-        return botNpc;
     }
 }
 
