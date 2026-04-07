@@ -4,6 +4,8 @@ import com.github.retrooper.packetevents.PacketEvents;
 import dev.faststats.bukkit.BukkitMetrics;
 import dev.faststats.core.ErrorTracker;
 import dev.nandi0813.practice.command.arena.ArenaCommand;
+import dev.nandi0813.practice.command.botduel.BotDuelCommand;
+import dev.nandi0813.practice.command.botduel.SpawnBotCommand;
 import dev.nandi0813.practice.command.event.EventCommand;
 import dev.nandi0813.practice.command.ffa.FFACommand;
 import dev.nandi0813.practice.command.ladder.LadderCommand;
@@ -28,6 +30,7 @@ import dev.nandi0813.practice.manager.fight.listener.BuildListener;
 import dev.nandi0813.practice.manager.fight.listener.EPCountdownListener;
 import dev.nandi0813.practice.manager.fight.listener.FireworkRocketCooldownListener;
 import dev.nandi0813.practice.manager.fight.match.MatchManager;
+import dev.nandi0813.practice.manager.fight.match.bot.BotMatchListener;
 import dev.nandi0813.practice.manager.fight.util.EntityHider;
 import dev.nandi0813.practice.manager.fight.util.EntityHiderListener;
 import dev.nandi0813.practice.manager.gui.setup.arena.ArenaGUISetupManager;
@@ -410,6 +413,18 @@ public final class ZonePractice extends JavaPlugin {
             server.getPluginCommand("nick").setTabCompleter(nickCommand);
         }
 
+        BotDuelCommand botDuelCommand = new BotDuelCommand();
+        if (server.getPluginCommand("botduel") != null) {
+            server.getPluginCommand("botduel").setExecutor(botDuelCommand);
+            server.getPluginCommand("botduel").setTabCompleter(botDuelCommand);
+        }
+
+        SpawnBotCommand spawnBotCommand = new SpawnBotCommand(this);
+        if (server.getPluginCommand("spawnbot") != null) {
+            server.getPluginCommand("spawnbot").setExecutor(spawnBotCommand);
+            server.getPluginCommand("spawnbot").setTabCompleter(spawnBotCommand);
+        }
+
         if (ConfigManager.getBoolean("CHAT.PRIVATE-CHAT-ENABLED")) {
             new MessageCommand();
             new ReplyCommand();
@@ -449,6 +464,7 @@ public final class ZonePractice extends JavaPlugin {
         pm.registerEvents(new EPCountdownListener(), this);
         pm.registerEvents(new FireworkRocketCooldownListener(), this);
         pm.registerEvents(new PlayerChatListener(), this);
+        pm.registerEvents(new BotMatchListener(), this);
     }
 
 }

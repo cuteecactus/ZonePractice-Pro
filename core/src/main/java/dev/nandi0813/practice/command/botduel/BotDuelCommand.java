@@ -82,12 +82,16 @@ public class BotDuelCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String label, String[] args) {
         if (args.length == 1) {
             List<String> names = new ArrayList<>();
+            for (NormalLadder ladder : LadderManager.getInstance().getEnabledLadders()) {
+                names.add(ladder.getName());
+            }
+            List<String> matches = new ArrayList<>();
             StringUtil.copyPartialMatches(
                     args[0],
-                    LadderUtil.getLadderNames(LadderManager.getInstance().getEnabledLadders()),
-                    names);
-            Collections.sort(names);
-            return names;
+                    names,
+                    matches);
+            Collections.sort(matches);
+            return matches;
         }
         return Collections.emptyList();
     }

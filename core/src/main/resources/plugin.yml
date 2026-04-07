@@ -2,7 +2,7 @@ name: ZonePracticePro
 version: '${project.version}'
 main: dev.nandi0813.practice.ZonePractice
 authors: [ Nandi0813 ]
-softdepend: [ PlaceholderAPI, Multiverse-Core, FastAsyncWorldEdit, My_Worlds, TAB ]
+softdepend: [ PlaceholderAPI, Multiverse-Core, FastAsyncWorldEdit, My_Worlds, TAB, Citizens ]
 loadbefore: [ CMI, CMILib ]
 api-version: 1.13
 commands:
@@ -62,6 +62,10 @@ commands:
   nick:
     aliases: [nickname]
     description: Change your formatted display name.
+  botduel:
+    description: Start a duel versus the neural-network bot.
+  spawnbot:
+    description: Spawn a debug neural bot at your location.
 
 permissions:
   zpp.admin:
@@ -73,6 +77,15 @@ permissions:
       zpp.settings.*: true
       zpp.admin.scoreboard: true
       zpp.update.notify: true
+      zpp.botduel: true
+      zpp.spawnbot: true
+
+  zpp.botduel:
+    description: Use the /botduel command.
+    default: op
+  zpp.spawnbot:
+    description: Use the /spawnbot debug command.
+    default: op
   zpp.setup:
     description: Setup everything.
     children:

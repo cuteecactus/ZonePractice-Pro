@@ -4,10 +4,12 @@ import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.fight.ffa.game.FFA;
 import dev.nandi0813.practice.manager.fight.match.Match;
 import dev.nandi0813.practice.manager.fight.match.Round;
+import dev.nandi0813.practice.manager.fight.match.bot.BotMatch;
 import dev.nandi0813.practice.manager.fight.match.enums.MatchType;
 import dev.nandi0813.practice.manager.fight.match.enums.TeamEnum;
 import dev.nandi0813.practice.manager.fight.match.type.duel.Duel;
 import dev.nandi0813.practice.manager.fight.match.type.partyffa.PartyFFA;
+import dev.nandi0813.practice.manager.fight.match.type.playersvsplayers.PlayersVsPlayers;
 import dev.nandi0813.practice.manager.fight.match.type.playersvsplayers.partysplit.PartySplit;
 import dev.nandi0813.practice.manager.fight.match.type.playersvsplayers.partyvsparty.PartyVsParty;
 import dev.nandi0813.practice.manager.fight.match.util.TeamUtil;
@@ -17,6 +19,7 @@ import dev.nandi0813.practice.manager.profile.Profile;
 import dev.nandi0813.practice.manager.profile.ProfileManager;
 import dev.nandi0813.practice.manager.sidebar.SidebarManager;
 import dev.nandi0813.practice.util.NameFormatUtil;
+import net.citizensnpcs.api.npc.NPC;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
 import org.bukkit.entity.Player;
@@ -77,7 +80,7 @@ public enum AdapterUtil {
      * Replaces team placeholders for a given team prefix (team1, team2, partyTeam, enemyTeam)
      */
     private static Component replaceTeamPlaceholders(Component line, String prefix, TeamEnum team,
-                                                     dev.nandi0813.practice.manager.fight.match.type.playersvsplayers.PlayersVsPlayers match, int winsNeeded) {
+                                                     PlayersVsPlayers match, int winsNeeded) {
         return line
                 .replaceText(replace("%" + prefix + "name%", team.getNameComponent()))
                 .replaceText(replace("%" + prefix + "color%", team.getColor()))
@@ -155,6 +158,7 @@ public enum AdapterUtil {
             case PARTY_FFA -> handlePartyFFAPlaceholders(line, (PartyFFA) match, player);
             case PARTY_SPLIT -> handlePartySplitPlaceholders(line, (PartySplit) match);
             case PARTY_VS_PARTY -> handlePartyVsPartyPlaceholders(line, (PartyVsParty) match, player);
+            case BOT_DUEL -> handleBotMatchPlaceholders(line, (BotMatch) match, player);
         };
     }
 
@@ -215,6 +219,10 @@ public enum AdapterUtil {
         return line;
     }
 
+    private static Component handleBotMatchPlaceholders(Component line, BotMatch botMatch, Player player) {
+        return line;
+    }
+
     public static Component replaceFFAPlaceholders(Player player, Component line, FFA ffa) {
         Statistic statistic = ffa.getStatistics().get(player);
 
@@ -263,6 +271,7 @@ public enum AdapterUtil {
             case PARTY_FFA -> handleSpectatorPartyFFAPlaceholders(line, (PartyFFA) match);
             case PARTY_SPLIT -> handleSpectatorPartySplitPlaceholders(line, (PartySplit) match);
             case PARTY_VS_PARTY -> handleSpectatorPartyVsPartyPlaceholders(line, (PartyVsParty) match);
+            case BOT_DUEL -> null;
         };
     }
 
@@ -284,6 +293,13 @@ public enum AdapterUtil {
                 .replaceText(replace("%player2ping%", getPingString(player2)))
                 .replaceText(replace("%player2rounds%", getRoundString(duel.getWinsNeeded(), duel.getWonRounds(player2))))
                 .replaceText(replace("%player2roundsNumber%", String.valueOf(duel.getWonRounds(player2))));
+    }
+
+    private static Component handleSpectatorDuelPlaceholders(Component line, BotMatch duel) {
+        Player player1 = duel.getPlayer();
+        NPC player2 = duel.getBotNpc();
+
+        return line;
     }
 
     private static Component handleSpectatorPartyFFAPlaceholders(Component line, PartyFFA partyFFA) {
