@@ -1,4 +1,4 @@
-VERSION: 38
+VERSION: 39
 
 CONSOLE-NAME: "<red>Console"
 CANT-USE-CONSOLE: "<red>You can't use this command from the console."
@@ -1442,6 +1442,33 @@ MATCH:
     ALREADY-SENT: "<red>The rematch request has already been sent out."
     TARGET-DONT-ACCEPT: "<red>%target% doesn't accept rematch requests."
     CANT-SEND-ANYMORE: "<red>You can't send rematch request for %target% anymore."
+  BOT-DUEL:
+    PLAYER-LEFT: "<red>%player% <yellow>left the match."
+    START:
+      MATCH-STARTING: "<yellow>Match is starting in <gold>%seconds% <yellow>%secondName%."
+      MATCH-STARTED: "<green>Match has been started."
+      ROUND-STARTING: "<yellow>Round is starting in <gold>%seconds% <yellow>%secondName%."
+      ROUND-STARTED: "<green>Round has been started."
+    MATCH-START:
+      - "<gray><st>----------------------------------------"
+      - "<gold><bold>Bot Duel"
+      - ""
+      - " <yellow>» Kit: <white>%ladder%"
+      - " <yellow>» Map: <white>%arena%"
+      - " <yellow>» Opponent: <white>%player%"
+      - "<gray><st>----------------------------------------"
+    ROUND-END:
+      - "<gray><st>----------------------------------------"
+      - "%player% <yellow>has <green>won <yellow>the round. <light_purple>%round% <yellow>more to win the match."
+      - "<gray><st>----------------------------------------"
+    MATCH-END-WIN:
+      - "<gray><st>----------------------------------------"
+      - "<green>You defeated the bot in this match."
+      - "<gray><st>----------------------------------------"
+    MATCH-END-LOSS:
+      - "<gray><st>----------------------------------------"
+      - "<red>The bot won this match."
+      - "<gray><st>----------------------------------------"
   DUEL:
     PLAYER-LEFT: "<red>%player% <yellow>left the match."
     RANKED-REQUIREMENT-REACHED: "<green>Congratulations! <yellow>You have reached the required conditions for ranked matches."

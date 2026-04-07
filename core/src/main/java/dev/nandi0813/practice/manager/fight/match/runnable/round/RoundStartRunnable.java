@@ -65,11 +65,11 @@ public class RoundStartRunnable extends BukkitRunnable {
             }
 
             if (this.round.getRoundNumber() == 1) {
-                message = StringUtil.replaceSecondString(LanguageManager.getString(path + ".START.MATCH-STARTED"), seconds);
+                message = StringUtil.replaceSecondString(getStartMessage(path, "MATCH-STARTED"), seconds);
                 this.match.setStatus(MatchStatus.LIVE);
                 SpectatorManager.getInstance().getSpectatorMenuGui().update();
             } else
-                message = StringUtil.replaceSecondString(LanguageManager.getString(path + ".START.ROUND-STARTED"), seconds);
+                message = StringUtil.replaceSecondString(getStartMessage(path, "ROUND-STARTED"), seconds);
 
             SoundManager.getInstance().getSound(SoundType.MATCH_STARTED).play(match.getPeople());
         } else {
@@ -87,9 +87,9 @@ public class RoundStartRunnable extends BukkitRunnable {
             }
 
             if (round.getRoundNumber() == 1)
-                message = StringUtil.replaceSecondString(LanguageManager.getString(path + ".START.MATCH-STARTING"), seconds);
+                message = StringUtil.replaceSecondString(getStartMessage(path, "MATCH-STARTING"), seconds);
             else
-                message = StringUtil.replaceSecondString(LanguageManager.getString(path + ".START.ROUND-STARTING"), seconds);
+                message = StringUtil.replaceSecondString(getStartMessage(path, "ROUND-STARTING"), seconds);
 
             this.seconds--;
 
@@ -97,6 +97,16 @@ public class RoundStartRunnable extends BukkitRunnable {
         }
 
         this.match.sendMessage(message, true);
+    }
+
+    private static String getStartMessage(String path, String key) {
+        String primary = LanguageManager.getString(path + ".START." + key);
+        if (primary != null) {
+            return primary;
+        }
+
+        String duelFallback = LanguageManager.getString("MATCH.DUEL.START." + key);
+        return duelFallback != null ? duelFallback : "";
     }
 
     public RoundStartRunnable begin() {

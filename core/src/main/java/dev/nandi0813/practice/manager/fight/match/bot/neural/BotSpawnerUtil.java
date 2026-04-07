@@ -1,6 +1,8 @@
 package dev.nandi0813.practice.manager.fight.match.bot.neural;
 
+import dev.nandi0813.practice.manager.fight.match.bot.BotMatch;
 import net.citizensnpcs.api.CitizensAPI;
+import net.citizensnpcs.api.ai.PathfinderType;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.api.trait.TraitInfo;
 import net.citizensnpcs.trait.SkinTrait;
@@ -14,15 +16,21 @@ public final class BotSpawnerUtil {
     }
 
     public static NPC spawnNeuralBot(JavaPlugin plugin, Location spawnLocation, Player target) {
+        return spawnNeuralBot(plugin, spawnLocation, target, null);
+    }
+
+    public static NPC spawnNeuralBot(JavaPlugin plugin, Location spawnLocation, Player target, BotMatch match) {
         registerTrait();
 
         NPC npc = CitizensAPI.getNPCRegistry().createNPC(EntityType.PLAYER, "PvP Bot");
 
         npc.getNavigator().getDefaultParameters().avoidWater(false);
-        npc.getNavigator().getDefaultParameters().useNewPathfinder(false);
-        npc.getDefaultGoalController().clear();
+        npc.getNavigator().getDefaultParameters().pathfinderType(PathfinderType.PLUGIN);
+        npc.getDefaultBehaviorController().clear();
+        npc.getNavigator().cancelNavigation();
 
         PvPBotTrait trait = new PvPBotTrait(plugin, target);
+        trait.setMatch(match);
         npc.addTrait(trait);
 
         SkinTrait skinTrait = npc.getOrAddTrait(SkinTrait.class);

@@ -171,7 +171,7 @@ public class BotMatch extends Match implements Team {
     public TeamEnum getTeam(Player player) { return TeamEnum.TEAM1; }
 
     private void spawnBot(Location spawnLoc) {
-        NPC npc = BotSpawnerUtil.spawnNeuralBot(ZonePractice.getInstance(), spawnLoc, player);
+        NPC npc = BotSpawnerUtil.spawnNeuralBot(ZonePractice.getInstance(), spawnLoc, player, this);
         this.botNpc = npc;
 
         if (npc.getEntity() instanceof Player botPlayer) {

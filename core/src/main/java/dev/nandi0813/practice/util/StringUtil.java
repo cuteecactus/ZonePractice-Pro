@@ -28,14 +28,25 @@ public enum StringUtil {
     }
 
     public static String replaceSecondString(String string, double seconds) {
+        if (string == null) {
+            return "";
+        }
+
+        String singular = LanguageManager.getString("SECOND-NAME.1SEC");
+        String plural = LanguageManager.getString("SECOND-NAME.1<SEC");
+        if (singular == null) singular = "second";
+        if (plural == null) plural = "seconds";
+
+        String secondName = seconds < 2 ? singular : plural;
+
         if ((seconds == Math.floor(seconds)) && !Double.isInfinite(seconds)) {
             return string
                     .replace("%seconds%", String.valueOf(NumberUtil.doubleToInt(seconds)))
-                    .replace("%secondName%", (seconds < 2 ? LanguageManager.getString("SECOND-NAME.1SEC") : LanguageManager.getString("SECOND-NAME.1<SEC")));
+                    .replace("%secondName%", secondName);
         } else {
             return string
                     .replace("%seconds%", String.valueOf(seconds))
-                    .replace("%secondName%", (seconds < 2 ? LanguageManager.getString("SECOND-NAME.1SEC") : LanguageManager.getString("SECOND-NAME.1<SEC")));
+                    .replace("%secondName%", secondName);
         }
     }
 

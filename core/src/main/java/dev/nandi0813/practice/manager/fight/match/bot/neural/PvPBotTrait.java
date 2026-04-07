@@ -1,11 +1,17 @@
 package dev.nandi0813.practice.manager.fight.match.bot.neural;
 
+import dev.nandi0813.practice.manager.fight.match.Round;
+import dev.nandi0813.practice.manager.fight.match.bot.BotMatch;
+import dev.nandi0813.practice.manager.fight.match.enums.MatchStatus;
+import dev.nandi0813.practice.manager.fight.match.enums.RoundStatus;
 import lombok.Setter;
 import net.citizensnpcs.api.trait.Trait;
 import net.citizensnpcs.api.trait.TraitName;
 import net.citizensnpcs.util.PlayerAnimation;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -17,7 +23,6 @@ import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -28,9 +33,12 @@ public class PvPBotTrait extends Trait {
     private JavaPlugin plugin;
     @Setter
     private Player target;
+    @Setter
+    private BotMatch match;
     private final AtomicBoolean requestInFlight = new AtomicBoolean(false);
     private final AtomicLong requestCounter = new AtomicLong(0L);
     private final AtomicLong lastAppliedRequest = new AtomicLong(0L);
+    private final AtomicLong lastRmbUseMillis = new AtomicLong(0L);
 
     public PvPBotTrait() {
         super("neural_bot");
@@ -49,6 +57,9 @@ public class PvPBotTrait extends Trait {
         if (npc == null || !npc.isSpawned() || target == null || !target.isOnline()) {
             return;
         }
+        if (!canRunInference()) {
+            return;
+        }
 
         Entity entity = npc.getEntity();
         if (!(entity instanceof Player botPlayer)) {
@@ -65,17 +76,33 @@ public class PvPBotTrait extends Trait {
 
         inferenceClient.fetchPrediction(state)
                 .whenComplete((ignored, throwable) -> requestInFlight.set(false))
-                .thenAcceptAsync(
-                        prediction -> {
-                            if (prediction == null || requestId < lastAppliedRequest.get()) {
-                                return;
-                            }
-                            lastAppliedRequest.set(requestId);
-                            applyPrediction(prediction);
-                        },
-                        resolvedPlugin.getServer().getScheduler().getMainThreadExecutor(resolvedPlugin)
-                )
+                .thenAccept(prediction -> Bukkit.getScheduler().runTask(resolvedPlugin, () -> {
+                    if (prediction == null || requestId < lastAppliedRequest.get()) {
+                        return;
+                    }
+                    lastAppliedRequest.set(requestId);
+                    applyPrediction(prediction);
+                }))
                 .exceptionally(ignored -> null);
+    }
+
+    private boolean canRunInference() {
+        if (match == null) {
+            return true;
+        }
+
+        MatchStatus matchStatus = match.getStatus();
+        Round round = match.getCurrentRound();
+        RoundStatus roundStatus = round != null ? round.getRoundStatus() : null;
+
+        return isFighting(matchStatus) && isFighting(roundStatus);
+    }
+
+    private static boolean isFighting(Enum<?> status) {
+        if (status == null) {
+            return false;
+        }
+        return status.name().equals("FIGHTING") || status.name().equals("LIVE");
     }
 
     private JavaPlugin resolvePlugin() {
@@ -98,10 +125,25 @@ public class PvPBotTrait extends Trait {
             hotbar.add(stack == null ? "AIR" : stack.getType().name());
         }
 
+        List<String> armor = new ArrayList<>(4);
+        ItemStack[] armorContents = botPlayer.getInventory().getArmorContents();
+        for (int i = 0; i < 4; i++) {
+            ItemStack armorPiece = (armorContents != null && i < armorContents.length) ? armorContents[i] : null;
+            armor.add(armorPiece == null ? "AIR" : armorPiece.getType().name());
+        }
+
+        float totalArmor = 0f;
+        if (botPlayer.getAttribute(Attribute.ARMOR) != null) {
+            totalArmor = (float) botPlayer.getAttribute(Attribute.ARMOR).getValue();
+        }
+
         InventoryState inventory = new InventoryState(
                 mainHandItem.getType().name(),
                 offHandItem.getType().name(),
-                hotbar
+                botPlayer.getInventory().getHeldItemSlot(),
+                hotbar,
+                armor,
+                totalArmor
         );
 
         return new GameState(String.valueOf(npc.getId()), botState, targetState, inventory);
@@ -119,7 +161,7 @@ public class PvPBotTrait extends Trait {
                 (float) vel.getX(),
                 (float) vel.getY(),
                 (float) vel.getZ(),
-                (float) player.getHealth(),
+                (float) (player.getHealth() + player.getAbsorptionAmount()),
                 (float) player.getFoodLevel(),
                 player.isOnGround()
         );
@@ -156,11 +198,17 @@ public class PvPBotTrait extends Trait {
             movement.subtract(right);
         }
 
+        Vector currentVelocity = botPlayer.getVelocity();
         if (movement.lengthSquared() > 0) {
             movement.normalize().multiply(pred.getInputSprint() > 0.5f ? 0.28 : 0.22);
+            movement.setY(currentVelocity.getY());
+        } else {
+            // Keep horizontal momentum so knockback and friction remain server-driven.
+            movement.setX(currentVelocity.getX());
+            movement.setY(currentVelocity.getY());
+            movement.setZ(currentVelocity.getZ());
         }
 
-        movement.setY(botPlayer.getVelocity().getY());
         if (pred.getInputJump() > 0.5f && botPlayer.isOnGround()) {
             movement.setY(0.42);
         }
@@ -170,8 +218,8 @@ public class PvPBotTrait extends Trait {
         botPlayer.setSneaking(pred.getInputSneak() > 0.5f);
         botPlayer.setSprinting(pred.getInputSprint() > 0.5f);
 
-        if (pred.getInputSlot() >= 2 && pred.getInputSlot() <= 10) {
-            botPlayer.getInventory().setHeldItemSlot(pred.getInputSlot() - 2);
+        if (pred.getInputSlot() >= 0 && pred.getInputSlot() <= 8) {
+            botPlayer.getInventory().setHeldItemSlot(pred.getInputSlot());
         }
 
         if (pred.getInputLmb() > 0.5f) {
@@ -182,11 +230,11 @@ public class PvPBotTrait extends Trait {
                     eye,
                     eye.getDirection(),
                     3.0,
-                    hit -> Objects.equals(hit, target)
+                    hit -> hit instanceof Player player && player.getUniqueId().equals(target.getUniqueId())
             );
 
-            if (rayResult != null && rayResult.getHitEntity() == target) {
-                target.damage(7.0, botPlayer);
+            if (rayResult != null && rayResult.getHitEntity() == target && botPlayer.getAttackCooldown() >= 0.92f) {
+                botPlayer.attack(target);
             }
         }
 
@@ -194,16 +242,27 @@ public class PvPBotTrait extends Trait {
             ItemStack inMainHand = botPlayer.getInventory().getItemInMainHand();
             Material heldType = inMainHand.getType();
 
-            if (heldType == Material.SPLASH_POTION) {
-                botPlayer.launchProjectile(ThrownPotion.class);
+            if (heldType == Material.SPLASH_POTION && shouldUseRmbNow(350L)) {
+                ThrownPotion potion = botPlayer.launchProjectile(ThrownPotion.class);
+                potion.setItem(singleItemCopy(inMainHand));
                 decrementMainHand(botPlayer);
             }
 
-            if (heldType == Material.ENDER_PEARL) {
+            if (heldType == Material.ENDER_PEARL && shouldUseRmbNow(950L)) {
                 botPlayer.launchProjectile(EnderPearl.class);
                 decrementMainHand(botPlayer);
             }
         }
+    }
+
+    private boolean shouldUseRmbNow(long minDelayMillis) {
+        long now = System.currentTimeMillis();
+        long last = lastRmbUseMillis.get();
+        if (now - last < minDelayMillis) {
+            return false;
+        }
+        lastRmbUseMillis.set(now);
+        return true;
     }
 
     private static void decrementMainHand(Player player) {
@@ -219,6 +278,12 @@ public class PvPBotTrait extends Trait {
 
         item.setAmount(item.getAmount() - 1);
         player.getInventory().setItemInMainHand(item);
+    }
+
+    private static ItemStack singleItemCopy(ItemStack source) {
+        ItemStack copy = source.clone();
+        copy.setAmount(1);
+        return copy;
     }
 
     private static float clamp(float value, float min, float max) {
