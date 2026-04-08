@@ -26,8 +26,6 @@ commands:
     aliases: spec
   party:
     aliases: p
-  hologram:
-    aliases: holo
   matchinv:
     description: Match inventory command.
   event:

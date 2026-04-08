@@ -287,12 +287,6 @@ public final class ZonePractice extends JavaPlugin {
             server.getPluginCommand("event").setTabCompleter(eventCommand);
         }
 
-        HologramCommand hologramCommand = new HologramCommand();
-        if (server.getPluginCommand("hologram") != null) {
-            server.getPluginCommand("hologram").setExecutor(hologramCommand);
-            server.getPluginCommand("hologram").setTabCompleter(hologramCommand);
-        }
-
         LadderCommand ladderCommand = new LadderCommand();
         if (server.getPluginCommand("ladder") != null) {
             server.getPluginCommand("ladder").setExecutor(ladderCommand);
