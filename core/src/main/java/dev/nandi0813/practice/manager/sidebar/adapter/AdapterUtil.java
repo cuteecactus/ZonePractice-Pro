@@ -25,7 +25,10 @@ import org.intellij.lang.annotations.RegExp;
 public enum AdapterUtil {
     ;
 
-    private static final String ROUND_SYMBOL = SidebarManager.getInstance().getConfig().getString("MATCH.ROUND-SYMBOL");
+    private static String getRoundSymbol() {
+        String symbol = SidebarManager.getInstance().getConfig().getString("MATCH.ROUND-SYMBOL");
+        return symbol == null || symbol.isBlank() ? "|" : symbol;
+    }
 
     // ==================== Helper Methods ====================
 
@@ -127,13 +130,13 @@ public enum AdapterUtil {
 
         for (int i = 1; i <= rounds; i++) {
             if (i <= wonRounds) {
-                string.append(ROUND_SYMBOL);
+                string.append(getRoundSymbol());
             } else {
                 if (firstNotWon) {
-                    string.append("<gray>").append(ROUND_SYMBOL);
+                    string.append("<gray>").append(getRoundSymbol());
                     firstNotWon = false;
                 } else {
-                    string.append(ROUND_SYMBOL);
+                    string.append(getRoundSymbol());
                 }
             }
         }

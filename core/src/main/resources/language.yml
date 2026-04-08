@@ -1,4 +1,4 @@
-VERSION: 38
+VERSION: 39
 
 CONSOLE-NAME: "<red>Console"
 CANT-USE-CONSOLE: "<red>You can't use this command from the console."
@@ -754,6 +754,7 @@ COMMAND:
           - " <red> » /%label% unranked <gray>- <white>Manage the unranked daily limit of the player." # Console
           - " <red> » /%label% exp <gray>- <white>Manage the experience of the player." # Console
           - " <red> » /%label% nametag <gray>- <white>Manage the nametag of the player." # Console
+          - " <red> » /%label% reload <gray>- <white>Reload practice config files."
           - "<red><st>------------------------------------------------"
       INFO:
         COMMAND-HELP: "<red>/%label% info <player>"
@@ -830,6 +831,10 @@ COMMAND:
         TARGET-OFFLINE: "<red>%target% is not online."
         TARGET-OP: "<red>You cannot reset %target%'s data."
         RESET-PLAYER: "<yellow>You have successfully reset <red>%target%'s <yellow>all data."
+      RELOAD:
+        COMMAND-HELP: "<red>/%label% reload"
+        RELOADED: "<green>Practice config files have been reloaded."
+        FAILED: "<red>Reload failed. Check console for details."
       NAMETAG:
         COMMAND-HELP:
           - "<red><st>------------------------------------------------"

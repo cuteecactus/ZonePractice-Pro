@@ -106,6 +106,7 @@ permissions:
       zpp.practice.unranked: true
       zpp.practice.exp: true
       zpp.practice.rename: true
+      zpp.practice.reload: true
       zpp.practice.stop: true
   zpp.practice.lobby:
     description: Teleport to and set the lobby.
@@ -129,6 +130,8 @@ permissions:
     description: Usage for the /prac rename command.
   zpp.practice.reset:
     description: Reset a player fully.
+  zpp.practice.reload:
+    description: Reload practice config files.
 
   zpp.practice.nametag.set:
     description: Set player's nametag.

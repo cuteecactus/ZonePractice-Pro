@@ -144,6 +144,16 @@ public class SidebarManager extends ConfigFile implements Listener {
         }, 20L, ConfigManager.getInt("SIDEBAR.UPDATE-TIME"));
     }
 
+    public void reloadSidebarConfig() {
+        reloadFile();
+
+        Bukkit.getScheduler().runTask(ZonePractice.getInstance(), () -> {
+            for (Player player : new ArrayList<>(boards.keySet())) {
+                updatePlayerSidebar(player);
+            }
+        });
+    }
+
     @Override
     public void setData() {
     }

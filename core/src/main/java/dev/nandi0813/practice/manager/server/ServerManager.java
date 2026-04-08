@@ -4,6 +4,7 @@ import dev.nandi0813.practice.ZonePractice;
 import dev.nandi0813.practice.manager.arena.util.ArenaWorldUtil;
 import dev.nandi0813.practice.manager.backend.BackendManager;
 import dev.nandi0813.practice.manager.backend.ConfigManager;
+import dev.nandi0813.practice.manager.backend.GUIFile;
 import dev.nandi0813.practice.manager.backend.LanguageManager;
 import dev.nandi0813.practice.manager.division.DivisionManager;
 import dev.nandi0813.practice.manager.inventory.InventoryManager;
@@ -239,13 +240,22 @@ public class ServerManager implements Listener {
         }
     }
 
-    public void reloadFiles() {
-        ConfigManager.reload();
-        LanguageManager.reload();
-        InventoryManager.getInstance().reloadFile();
-        DivisionManager.getInstance().reloadRanks();
-        BackendManager.reload();
-        goldenHead.reload();
+    public boolean reloadFiles() {
+        try {
+            ConfigManager.reload();
+            LanguageManager.reload();
+            GUIFile.reload();
+            InventoryManager.getInstance().reloadFile();
+            DivisionManager.getInstance().reloadRanks();
+            BackendManager.reload();
+            loadLobby();
+            SidebarManager.getInstance().reloadSidebarConfig();
+            goldenHead.reload();
+            return true;
+        } catch (Exception e) {
+            Common.sendConsoleMMMessage("<red>Failed to reload practice files: " + e.getMessage());
+            return false;
+        }
     }
 
     public void onPlayerQuit(Player player) {
