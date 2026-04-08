@@ -97,6 +97,36 @@ public class PlayerUtil {
         player.setItemOnCursor(null);
     }
 
+    public static void clearMainInventory(Player player) {
+        if (player == null) {
+            return;
+        }
+
+        PlayerInventory inventory = player.getInventory();
+        ItemStack[] storage = inventory.getStorageContents();
+        inventory.setStorageContents(new ItemStack[storage.length]);
+
+        if (hasPersonalCraftingGridOpen(player)) {
+            for (int i = 1; i <= 4; i++) {
+                player.getOpenInventory().setItem(i, null);
+            }
+        }
+
+        player.setItemOnCursor(null);
+    }
+
+    public static void clearArmor(Player player) {
+        if (player == null) {
+            return;
+        }
+
+        PlayerInventory inventory = player.getInventory();
+        inventory.setHelmet(null);
+        inventory.setChestplate(null);
+        inventory.setLeggings(null);
+        inventory.setBoots(null);
+    }
+
     public static void setCollidesWithEntities(Player player, boolean bool) {
         player.setCollidable(bool);
     }
